@@ -1,4 +1,4 @@
-# Privacy Policy - Twitter 1Click Block & Mute
+# Privacy Policy - Ultimate Twitter Block
 
 Last updated: February 20, 2026
 

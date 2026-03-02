@@ -341,9 +341,9 @@ function buildUserscript() {
   );
 
   // Build userscript header
-  const REPO_RAW = 'https://raw.githubusercontent.com/satomasahiro2005/twitter-1click-block-and-mute/main';
+  const REPO_RAW = 'https://raw.githubusercontent.com/satomasahiro2005/ultimate-twitter-block/main';
   const header = `// ==UserScript==
-// @name         Twitter 1Click Block & Mute
+// @name         Ultimate Twitter Block
 // @namespace    twitter-block-userscript
 // @version      ${version}
 // @description  Add one-click block/mute buttons to tweets, profiles, and search suggestions on Twitter/X
