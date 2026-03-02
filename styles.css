@@ -1,18 +1,5 @@
 /* ========== Twitter 1Click Block & Mute ========== */
 
-/* Followボタン + twblockボタンのラッパー */
-.twblock-follow-wrapper {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  flex-shrink: 0;
-}
-
-/* ラッパー内のFollowボタン親のmargin-leftをリセット */
-.twblock-follow-wrapper > :not(.twblock-btn-container) {
-  margin-left: 0 !important;
-}
-
 /* ボタンコンテナ（共通） */
 .twblock-btn-container {
   display: flex;
