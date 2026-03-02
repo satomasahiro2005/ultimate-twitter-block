@@ -736,21 +736,17 @@
       }
       if (!followChild) return;
 
-      const wrapper = document.createElement('div');
-      wrapper.className = 'twblock-follow-wrapper';
-      targetRow.insertBefore(wrapper, followChild);
-      wrapper.appendChild(buttons);
-      wrapper.appendChild(followChild);
-
-      // Followボタン親のmargin-leftをリセット（X側の12pxが余計）
-      followChild.style.marginLeft = '0';
+      // React管理下のFollowボタンをreparentすると
+      // プロフィールで「Something went wrong」が出る場合があるため、
+      // FollowボタンのDOMは動かさず twblock ボタンのみを挿入する。
+      targetRow.insertBefore(buttons, followChild);
 
       if (isProfile) {
         // ボタンコンテナを上揃えにして⋯/Followと縦位置を合わせる
         buttons.style.alignSelf = 'flex-start';
         // gapを⋯のmargin-right(8px)に揃える
         buttons.style.gap = '8px';
-        wrapper.style.gap = '8px';
+        buttons.style.marginRight = '8px';
       }
     });
   }
