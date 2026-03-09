@@ -1,12 +1,35 @@
 (function () {
   'use strict';
 
+  if (window.__twblockInjected) return;
+  window.__twblockInjected = true;
+
   const PROCESSED = 'data-twblock';
   const RESERVED_PATHS = new Set([
     'home', 'explore', 'search', 'notifications', 'messages',
     'settings', 'i', 'compose', 'login', 'logout', 'signup',
     'tos', 'privacy', 'about', 'help', 'jobs', 'download',
   ]);
+  const PROFILE_SUBPATHS = new Set([
+    'with_replies', 'media', 'likes', 'highlights', 'articles',
+    'followers', 'following', 'verified_followers',
+  ]);
+  const ICON_CACHE_VERSION = 3;
+  const BLOCK_MENU_LABEL_RE = /\bBlock\b|ブロック|屏蔽/;
+  const UNBLOCK_MENU_LABEL_RE = /\bUnblock\b|ブロック解除|取消屏蔽/;
+  const MUTE_MENU_LABEL_RE = /\bMute\b|ミュート|隐藏/;
+  const UNMUTE_MENU_LABEL_RE = /\bUnmute\b|ミュート解除|取消隐藏/;
+  const CONVERSATION_MENU_LABEL_RE = /\bconversation\b|会話|对话|此对话/;
+  const FALLBACK_BLOCK_ICON =
+    '<svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true">' +
+    '<circle cx="12" cy="12" r="8" stroke="currentColor" stroke-width="1.8" fill="none"/>' +
+    '<path d="M7.5 7.5l9 9" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>' +
+    '</svg>';
+  const FALLBACK_MUTE_ICON =
+    '<svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true">' +
+    '<path d="M0 0h24v24H0z" fill="none"/>' +
+    '<path d="M16.5 12c0-1.77-1.02-3.29-2.5-4.03v2.21l2.45 2.45c.03-.2.05-.41.05-.63zm2.5 0c0 .94-.2 1.82-.54 2.64l1.51 1.51C20.63 14.91 21 13.5 21 12c0-4.28-2.99-7.86-7-8.77v2.06c2.89.86 5 3.54 5 6.71zM4.27 3L3 4.27 7.73 9H3v6h4l5 5v-6.73l4.25 4.25c-.67.52-1.42.93-2.25 1.18v2.06c1.38-.31 2.63-.95 3.69-1.81L19.73 21 21 19.73l-9-9L4.27 3zM12 4L9.91 6.09 12 8.18V4z" fill="currentColor"/>' +
+    '</svg>';
 
   // ---- SVGアイコン（ストレージ or パッシブ取得で動的設定） ----
   let BLOCK_ICON = '';
@@ -20,7 +43,8 @@
   }
 
   function getIcon(action) {
-    return action === 'block' ? BLOCK_ICON : MUTE_ICON;
+    if (action === 'block') return BLOCK_ICON || FALLBACK_BLOCK_ICON;
+    return MUTE_ICON || FALLBACK_MUTE_ICON;
   }
 
   // ---- i18n ヘルパー（init時にキャッシュ、処理中はchrome.*不使用） ----
@@ -82,10 +106,10 @@
   function loadStoredIcons() {
     return new Promise((resolve) => {
       chrome.storage.local.get('icons', (data) => {
-        if (data.icons) {
+        if (data.icons && data.icons.version === ICON_CACHE_VERSION) {
           if (data.icons.block) BLOCK_ICON = data.icons.block;
           if (data.icons.mute) MUTE_ICON = data.icons.mute;
-          iconsExtracted = true;
+          iconsExtracted = Boolean(BLOCK_ICON && MUTE_ICON);
         }
         resolve();
       });
@@ -109,16 +133,19 @@
   // 既存ボタンのアイコンを一括差し替え
   function replaceAllButtonIcons() {
     document.querySelectorAll('.twblock-block:not(.twblock-success)').forEach(btn => {
-      btn.innerHTML = BLOCK_ICON;
+      btn.innerHTML = getIcon('block');
     });
     document.querySelectorAll('.twblock-mute:not(.twblock-success)').forEach(btn => {
-      btn.innerHTML = MUTE_ICON;
+      btn.innerHTML = getIcon('mute');
     });
   }
 
   // メニューアイテムからBlock/MuteのSVGを抽出する共通ロジック
   function extractIconsFromMenuItems(menuItems) {
-    let foundBlock = false, foundMute = false;
+    let foundBlock = false;
+    let foundMute = false;
+    let nextBlockIcon = BLOCK_ICON;
+    let nextMuteIcon = MUTE_ICON;
 
     for (const item of menuItems) {
       const text = item.textContent || '';
@@ -127,19 +154,23 @@
       const d = pathEl.getAttribute('d');
       if (!d) continue;
 
-      if (!foundBlock && /\bBlock\b|ブロック/.test(text) && !/Unblock|ブロック解除/.test(text)) {
-        BLOCK_ICON = '<svg viewBox="0 0 24 24" width="20" height="20"><path d="' + escapeAttr(d) + '" fill="currentColor"/></svg>';
+      if (!foundBlock && BLOCK_MENU_LABEL_RE.test(text) && !UNBLOCK_MENU_LABEL_RE.test(text)) {
+        nextBlockIcon = '<svg viewBox="0 0 24 24" width="20" height="20"><path d="' + escapeAttr(d) + '" fill="currentColor"/></svg>';
         foundBlock = true;
       }
-      if (!foundMute && /\bMute\b|ミュート/.test(text) && !/Unmute|ミュート解除|conversation|会話/.test(text)) {
-        MUTE_ICON = '<svg viewBox="0 0 24 24" width="20" height="20"><path d="' + escapeAttr(d) + '" fill="currentColor"/></svg>';
+      if (!foundMute && MUTE_MENU_LABEL_RE.test(text) &&
+          !UNMUTE_MENU_LABEL_RE.test(text) &&
+          !CONVERSATION_MENU_LABEL_RE.test(text)) {
+        nextMuteIcon = '<svg viewBox="0 0 24 24" width="20" height="20"><path d="' + escapeAttr(d) + '" fill="currentColor"/></svg>';
         foundMute = true;
       }
     }
 
     if (foundBlock || foundMute) {
-      iconsExtracted = true;
-      chrome.storage.local.set({ icons: { block: BLOCK_ICON, mute: MUTE_ICON } });
+      if (foundBlock) BLOCK_ICON = nextBlockIcon;
+      if (foundMute) MUTE_ICON = nextMuteIcon;
+      iconsExtracted = Boolean(BLOCK_ICON && MUTE_ICON);
+      chrome.storage.local.set({ icons: { version: ICON_CACHE_VERSION, block: BLOCK_ICON, mute: MUTE_ICON } });
       replaceAllButtonIcons();
     }
   }
@@ -203,12 +234,10 @@
     }
 
     const layersObserver = new MutationObserver(() => {
-      if (!iconsExtracted) {
-        setTimeout(() => {
-          const menuItems = document.querySelectorAll('[role="menuitem"]');
-          if (menuItems.length > 0) extractIconsFromMenuItems(menuItems);
-        }, 300);
-      }
+      setTimeout(() => {
+        const menuItems = document.querySelectorAll('[role="menuitem"]');
+        if (menuItems.length > 0) extractIconsFromMenuItems(menuItems);
+      }, 300);
     });
 
     layersObserver.observe(layers, { childList: true, subtree: true });
@@ -291,10 +320,34 @@
     return null;
   }
 
-  function getProfileScreenName() {
-    const m = window.location.pathname.match(/^\/([A-Za-z0-9_]{1,15})$/);
-    if (m && !RESERVED_PATHS.has(m[1].toLowerCase())) return m[1];
+  function getProfilePathInfo() {
+    const parts = window.location.pathname.split('/').filter(Boolean);
+    if (parts.length === 0) return null;
+
+    const screenName = parts[0];
+    if (!/^[A-Za-z0-9_]{1,15}$/.test(screenName) || RESERVED_PATHS.has(screenName.toLowerCase())) {
+      return null;
+    }
+
+    if (parts.length === 1) {
+      return { screenName, section: null };
+    }
+
+    if (parts.length === 2 && PROFILE_SUBPATHS.has(parts[1].toLowerCase())) {
+      return { screenName, section: parts[1].toLowerCase() };
+    }
+
     return null;
+  }
+
+  function getProfileScreenName() {
+    const info = getProfilePathInfo();
+    return info ? info.screenName : null;
+  }
+
+  function isViewingProfileTimeline(screenName) {
+    const info = getProfilePathInfo();
+    return Boolean(info && info.screenName.toLowerCase() === screenName.toLowerCase());
   }
 
   let myScreenName = null;
@@ -506,8 +559,13 @@
           chrome.runtime.sendMessage({ type: 'ACTION_COMPLETED', action }).catch(() => {});
           showToast(msg(action === 'block' ? 'toastBlocked' : 'toastMuted', screenName));
 
-          // 引用ツイート内のボタンなら引用部分にバー表示
           const btnContainer = btn.closest('.twblock-btn-container');
+          if (action === 'block' && btnContainer && btnContainer.classList.contains('twblock-profile')) {
+            setTimeout(() => window.location.reload(), 300);
+            return;
+          }
+
+          // 引用ツイート内のボタンなら引用部分にバー表示
           if (btnContainer && btnContainer._quotedBlock) {
             setTimeout(() => hideQuotedTweet(btnContainer._quotedBlock, screenName, action), 300);
           } else {
@@ -619,7 +677,7 @@
         }
 
         // 元投稿者のボタンをgrok/caret行に挿入
-        const authorName = rtInfo ? extractAuthorScreenName(tweet) : extractScreenName(tweet);
+        const authorName = extractAuthorScreenName(tweet) || extractScreenName(tweet);
         if (!authorName || authorName === me) {
           processQuotedTweet(tweet, me);
           return;
@@ -666,7 +724,9 @@
             activeBtn.classList.add('twblock-success');
             activeBtn.innerHTML = CHECK_ICON;
           }
-          hideTweet(tweet, authorName, blockedAction);
+          if (!isViewingProfileTimeline(authorName)) {
+            hideTweet(tweet, authorName, blockedAction);
+          }
         }
 
         processQuotedTweet(tweet, me);
@@ -737,7 +797,9 @@
           activeBtn.classList.add('twblock-success');
           activeBtn.innerHTML = CHECK_ICON;
         }
-        hideQuotedTweet(block, qtScreenName, blockedAction);
+        if (!isViewingProfileTimeline(qtScreenName)) {
+          hideQuotedTweet(block, qtScreenName, blockedAction);
+        }
       }
     });
   }
@@ -904,7 +966,7 @@
       const newIcons = changes.icons.newValue || {};
       if (newIcons.block) BLOCK_ICON = newIcons.block;
       if (newIcons.mute) MUTE_ICON = newIcons.mute;
-      iconsExtracted = true;
+      iconsExtracted = Boolean(BLOCK_ICON && MUTE_ICON);
       replaceAllButtonIcons();
     }
   });
@@ -934,3 +996,4 @@
     init();
   }
 })();
+

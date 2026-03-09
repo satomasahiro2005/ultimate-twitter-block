@@ -175,6 +175,7 @@ function buildUserscript() {
   // Load locale messages
   const enMessages = JSON.parse(readFile('_locales/en/messages.json'));
   const jaMessages = JSON.parse(readFile('_locales/ja/messages.json'));
+  const zhCnMessages = JSON.parse(readFile('_locales/zh_CN/messages.json'));
 
   // Build _M object entries (resolve $PLACEHOLDER$ → $1 etc.)
   function buildLocaleObj(messages) {
@@ -192,6 +193,7 @@ function buildUserscript() {
   }
   const enMap = buildLocaleObj(enMessages);
   const jaMap = buildLocaleObj(jaMessages);
+  const zhCnMap = buildLocaleObj(zhCnMessages);
 
   // Load source files
   const contentJs = readFile('content.js');
@@ -235,8 +237,9 @@ function buildUserscript() {
     /\s*\/\/ ---- i18n ヘルパー[\s\S]*?function msg\(key, sub\) \{[\s\S]*?\}\s*\n/,
     `
   // ---- i18n ----
-  const _L = navigator.language.startsWith('ja') ? 'ja' : 'en';
-  const _M = ${JSON.stringify({ en: enMap, ja: jaMap })};
+  const _lang = (navigator.language || '').toLowerCase();
+  const _L = _lang.startsWith('ja') ? 'ja' : (_lang.startsWith('zh') ? 'zh_CN' : 'en');
+  const _M = ${JSON.stringify({ en: enMap, ja: jaMap, zh_CN: zhCnMap })};
   function _i18n(key) { return (_M[_L] || _M.en)[key] || key; }
   const i18n = {};
   function cacheI18n() {
@@ -266,10 +269,10 @@ function buildUserscript() {
     return new Promise((resolve) => {
       try {
         const stored = JSON.parse(localStorage.getItem('twblock_icons'));
-        if (stored) {
+        if (stored && stored.version === ICON_CACHE_VERSION) {
           if (stored.block) BLOCK_ICON = stored.block;
           if (stored.mute) MUTE_ICON = stored.mute;
-          iconsExtracted = true;
+          iconsExtracted = Boolean(BLOCK_ICON && MUTE_ICON);
         }
       } catch {}
       resolve();
@@ -295,8 +298,8 @@ function buildUserscript() {
 
   // Replace chrome.storage.local.set for icons
   transformed = transformed.replace(
-    /chrome\.storage\.local\.set\(\{ icons: \{ block: BLOCK_ICON, mute: MUTE_ICON \} \}\);/g,
-    "localStorage.setItem('twblock_icons', JSON.stringify({ block: BLOCK_ICON, mute: MUTE_ICON }));"
+    /chrome\.storage\.local\.set\(\{ icons: \{ version: ICON_CACHE_VERSION, block: BLOCK_ICON, mute: MUTE_ICON \} \}\);/g,
+    "localStorage.setItem('twblock_icons', JSON.stringify({ version: ICON_CACHE_VERSION, block: BLOCK_ICON, mute: MUTE_ICON }));"
   );
 
   // Replace chrome.storage.local.get('accentColor', ...) with localStorage
@@ -383,3 +386,4 @@ if (arg && arg !== 'zip' && arg !== 'userscript') {
   console.error(`Usage: node build.js [zip|userscript]`);
   process.exit(1);
 }
+

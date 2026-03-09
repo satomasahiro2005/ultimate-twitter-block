@@ -55,7 +55,9 @@ node build.js userscript # ユーザースクリプトのみ
 
 - 日本語
 - English
+- 简体中文
 
 ## ライセンス
 
 MIT
+

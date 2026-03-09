@@ -1,0 +1,58 @@
+{
+  "extName": {
+    "message": "Ultimate Twitter Block"
+  },
+  "extDescription": {
+    "message": "在 Twitter/X 上为每条推文、转发、引用推文和个人资料添加一键屏蔽与隐藏按钮。原生界面风格。"
+  },
+
+  "blockLabel": { "message": "屏蔽" },
+  "muteLabel": { "message": "隐藏" },
+  "blockedStatus": { "message": "已屏蔽" },
+  "mutedStatus": { "message": "已隐藏" },
+  "unblockLabel": { "message": "取消屏蔽" },
+  "unmuteLabel": { "message": "取消隐藏" },
+
+  "toastBlocked": {
+    "message": "已屏蔽 @$USER$",
+    "placeholders": { "user": { "content": "$1" } }
+  },
+  "toastMuted": {
+    "message": "已隐藏 @$USER$",
+    "placeholders": { "user": { "content": "$1" } }
+  },
+  "toastUnblocked": {
+    "message": "已对 @$USER$ 取消屏蔽",
+    "placeholders": { "user": { "content": "$1" } }
+  },
+  "toastUnmuted": {
+    "message": "已对 @$USER$ 取消隐藏",
+    "placeholders": { "user": { "content": "$1" } }
+  },
+
+  "errorTimeout": { "message": "请求超时" },
+  "errorOccurred": { "message": "发生错误" },
+
+  "popupDescription": { "message": "在推文和个人资料中一键屏蔽与隐藏" },
+  "settingsLabel": { "message": "设置" },
+
+  "sectionButtons": { "message": "按钮显示" },
+  "showBlockButton": { "message": "显示屏蔽按钮" },
+  "showMuteButton": { "message": "显示隐藏按钮" },
+  "confirmBlockFollowingLabel": { "message": "屏蔽已关注用户前先确认" },
+  "confirmBlockFollowing": {
+    "message": "你已关注 @$USER$。仍要屏蔽吗？",
+    "placeholders": { "user": { "content": "$1" } }
+  },
+
+  "sectionStats": { "message": "统计" },
+  "resetStats": { "message": "重置统计" },
+
+  "sectionReset": { "message": "重置" },
+  "resetHint": { "message": "将统计、图标和设置恢复为默认值" },
+  "fullReset": { "message": "完全重置扩展" },
+  "confirmReset": { "message": "要重置所有数据（统计和设置）吗？" },
+
+  "supportLabel": { "message": "支持" }
+}
+
