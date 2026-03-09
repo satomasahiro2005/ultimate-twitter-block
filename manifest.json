@@ -15,8 +15,7 @@
     }
   },
   "permissions": [
-    "storage",
-    "scripting"
+    "storage"
   ],
   "host_permissions": [
     "https://x.com/*",
