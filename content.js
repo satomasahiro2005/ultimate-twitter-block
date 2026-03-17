@@ -5,6 +5,7 @@
   window.__twblockInjected = true;
 
   const PROCESSED = 'data-twblock';
+  const ATTRIBUTION_PROCESSED = 'data-twblock-attribution';
   const RESERVED_PATHS = new Set([
     'home', 'explore', 'search', 'notifications', 'messages',
     'settings', 'i', 'compose', 'login', 'logout', 'signup',
@@ -14,12 +15,27 @@
     'with_replies', 'media', 'likes', 'highlights', 'articles',
     'followers', 'following', 'verified_followers',
   ]);
-  const ICON_CACHE_VERSION = 3;
+  const ICON_CACHE_VERSION = 4;
   const BLOCK_MENU_LABEL_RE = /\bBlock\b|ブロック|屏蔽/;
   const UNBLOCK_MENU_LABEL_RE = /\bUnblock\b|ブロック解除|取消屏蔽/;
   const MUTE_MENU_LABEL_RE = /\bMute\b|ミュート|隐藏/;
   const UNMUTE_MENU_LABEL_RE = /\bUnmute\b|ミュート解除|取消隐藏/;
   const CONVERSATION_MENU_LABEL_RE = /\bconversation\b|会話|对话|此对话/;
+  const SVG_NS = 'http://www.w3.org/2000/svg';
+  const ICON_DEBUG_STORAGE_KEY = 'twblock:debug-icons';
+  const MAX_ICON_DEBUG_HISTORY = 20;
+  const BLOCK_ICON_SIGNATURES = new Set(['498278e7']);
+  const MUTE_ICON_SIGNATURES = new Set(['d3853445']);
+  const ICON_SHAPE_ATTRS = {
+    path: ['d', 'transform', 'fill-rule', 'clip-rule', 'stroke-width', 'stroke-linecap', 'stroke-linejoin', 'stroke-miterlimit'],
+    circle: ['cx', 'cy', 'r', 'transform', 'stroke-width'],
+    ellipse: ['cx', 'cy', 'rx', 'ry', 'transform', 'stroke-width'],
+    rect: ['x', 'y', 'width', 'height', 'rx', 'ry', 'transform', 'stroke-width'],
+    line: ['x1', 'y1', 'x2', 'y2', 'transform', 'stroke-width', 'stroke-linecap'],
+    polyline: ['points', 'transform', 'stroke-width', 'stroke-linecap', 'stroke-linejoin'],
+    polygon: ['points', 'transform', 'stroke-width', 'stroke-linejoin', 'fill-rule', 'clip-rule'],
+  };
+  const ICON_GROUP_ATTRS = ['transform'];
   const FALLBACK_BLOCK_ICON =
     '<svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true">' +
     '<circle cx="12" cy="12" r="8" stroke="currentColor" stroke-width="1.8" fill="none"/>' +
@@ -34,12 +50,281 @@
   // ---- SVGアイコン（ストレージ or パッシブ取得で動的設定） ----
   let BLOCK_ICON = '';
   let MUTE_ICON = '';
+  let iconDebugEnabled = false;
+  const iconDebugHistory = [];
 
   const CHECK_ICON =
     '<svg viewBox="0 0 24 24" width="20" height="20"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41L9 16.17z" fill="currentColor"/></svg>';
 
   function escapeAttr(s) {
     return s.replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  }
+
+  function normalizeSpace(value) {
+    return String(value || '').replace(/\s+/g, ' ').trim();
+  }
+
+  function hashString(value) {
+    let hash = 2166136261;
+    for (let i = 0; i < value.length; i++) {
+      hash ^= value.charCodeAt(i);
+      hash = Math.imul(hash, 16777619);
+    }
+    return (hash >>> 0).toString(16).padStart(8, '0');
+  }
+
+  function getIconSignatureSet(action) {
+    return action === 'block' ? BLOCK_ICON_SIGNATURES : MUTE_ICON_SIGNATURES;
+  }
+
+  function rememberIconSignature(action, signature) {
+    if (!signature) return;
+    getIconSignatureSet(action).add(signature);
+  }
+
+  function loadStoredIconSignatures(signatures) {
+    if (!signatures || typeof signatures !== 'object') return;
+    ['block', 'mute'].forEach((action) => {
+      const values = Array.isArray(signatures[action]) ? signatures[action] : [];
+      values.forEach((value) => {
+        if (typeof value === 'string' && value) rememberIconSignature(action, value);
+      });
+    });
+  }
+
+  function getStoredIconSignatures() {
+    return {
+      block: Array.from(BLOCK_ICON_SIGNATURES),
+      mute: Array.from(MUTE_ICON_SIGNATURES),
+    };
+  }
+
+  function persistIcons() {
+    chrome.storage.local.set({
+      icons: {
+        version: ICON_CACHE_VERSION,
+        block: BLOCK_ICON,
+        mute: MUTE_ICON,
+        signatures: getStoredIconSignatures(),
+      },
+    });
+  }
+
+  function getPaintState(node, attrName) {
+    const tag = node.tagName.toLowerCase();
+    const value = normalizeSpace(node.getAttribute(attrName));
+    if (attrName === 'fill') {
+      const strokeValue = normalizeSpace(node.getAttribute('stroke'));
+      const hasVisibleStroke = strokeValue && strokeValue !== 'none';
+      if (node.hasAttribute('fill')) return value === 'none' ? 'none' : 'paint';
+      return (tag === 'line' || hasVisibleStroke) ? 'none' : 'paint';
+    }
+    if (!node.hasAttribute('stroke')) return 'none';
+    return value === 'none' ? 'none' : 'paint';
+  }
+
+  function appendIconSignatureParts(node, parts) {
+    Array.from(node.children).forEach((child) => {
+      const tag = child.tagName.toLowerCase();
+      if (tag === 'g') {
+        const transform = normalizeSpace(child.getAttribute('transform'));
+        if (transform) parts.push('g:transform=' + transform);
+        appendIconSignatureParts(child, parts);
+        if (transform) parts.push('/g');
+        return;
+      }
+
+      const attrs = ICON_SHAPE_ATTRS[tag];
+      if (!attrs) return;
+
+      const attrParts = [];
+      attrs.forEach((attr) => {
+        const value = normalizeSpace(child.getAttribute(attr));
+        if (value) attrParts.push(attr + '=' + value);
+      });
+      attrParts.push('fill=' + getPaintState(child, 'fill'));
+      attrParts.push('stroke=' + getPaintState(child, 'stroke'));
+      parts.push(tag + ':' + attrParts.join(','));
+    });
+  }
+
+  function getIconSignature(svgEl) {
+    if (!svgEl) return '';
+    const parts = ['viewBox=' + (normalizeSpace(svgEl.getAttribute('viewBox')) || '0 0 24 24')];
+    appendIconSignatureParts(svgEl, parts);
+    return hashString(parts.join('|'));
+  }
+
+  function copySvgAttributes(source, target, attrs) {
+    attrs.forEach((attr) => {
+      const value = normalizeSpace(source.getAttribute(attr));
+      if (value) target.setAttribute(attr, value);
+    });
+  }
+
+  function applySanitizedPaint(source, target) {
+    const tag = source.tagName.toLowerCase();
+    const fillValue = normalizeSpace(source.getAttribute('fill'));
+    const strokeValue = normalizeSpace(source.getAttribute('stroke'));
+    const hasVisibleStroke = strokeValue && strokeValue !== 'none';
+
+    if (source.hasAttribute('fill')) {
+      target.setAttribute('fill', fillValue === 'none' ? 'none' : 'currentColor');
+    } else if (tag === 'line' || hasVisibleStroke) {
+      target.setAttribute('fill', 'none');
+    } else {
+      target.setAttribute('fill', 'currentColor');
+    }
+
+    if (source.hasAttribute('stroke')) {
+      target.setAttribute('stroke', strokeValue === 'none' ? 'none' : 'currentColor');
+    }
+  }
+
+  function sanitizeSvgNode(node) {
+    const tag = node.tagName.toLowerCase();
+
+    if (tag === 'g') {
+      const group = document.createElementNS(SVG_NS, 'g');
+      copySvgAttributes(node, group, ICON_GROUP_ATTRS);
+      Array.from(node.children).forEach((child) => {
+        const sanitizedChild = sanitizeSvgNode(child);
+        if (sanitizedChild) group.appendChild(sanitizedChild);
+      });
+      return (group.childNodes.length || group.attributes.length) ? group : null;
+    }
+
+    const attrs = ICON_SHAPE_ATTRS[tag];
+    if (!attrs) return null;
+
+    const sanitized = document.createElementNS(SVG_NS, tag);
+    copySvgAttributes(node, sanitized, attrs);
+    applySanitizedPaint(node, sanitized);
+    return sanitized;
+  }
+
+  function buildInlineIconSvg(svgEl) {
+    if (!svgEl) return '';
+    const svg = document.createElementNS(SVG_NS, 'svg');
+    svg.setAttribute('viewBox', normalizeSpace(svgEl.getAttribute('viewBox')) || '0 0 24 24');
+    svg.setAttribute('width', '20');
+    svg.setAttribute('height', '20');
+    svg.setAttribute('aria-hidden', 'true');
+    Array.from(svgEl.children).forEach((child) => {
+      const sanitizedChild = sanitizeSvgNode(child);
+      if (sanitizedChild) svg.appendChild(sanitizedChild);
+    });
+    return svg.childNodes.length ? svg.outerHTML : '';
+  }
+
+  function getMenuItemLabelMatch(text) {
+    if (BLOCK_MENU_LABEL_RE.test(text) && !UNBLOCK_MENU_LABEL_RE.test(text)) return 'block';
+    if (MUTE_MENU_LABEL_RE.test(text) &&
+        !UNMUTE_MENU_LABEL_RE.test(text) &&
+        !CONVERSATION_MENU_LABEL_RE.test(text)) return 'mute';
+    return '';
+  }
+
+  function describeMenuItem(item) {
+    const text = normalizeSpace(item.textContent || '');
+    const svgEl = item.querySelector('svg');
+    const signature = getIconSignature(svgEl);
+    let signatureMatch = '';
+    if (signature) {
+      if (BLOCK_ICON_SIGNATURES.has(signature)) signatureMatch = 'block';
+      else if (MUTE_ICON_SIGNATURES.has(signature)) signatureMatch = 'mute';
+    }
+
+    return {
+      text,
+      signature,
+      signatureMatch,
+      labelMatch: getMenuItemLabelMatch(text),
+      matchedBy: '',
+      iconMarkup: buildInlineIconSvg(svgEl),
+    };
+  }
+
+  function buildMenuIconSnapshot(menuItems, reason) {
+    return {
+      reason,
+      timestamp: new Date().toISOString(),
+      entries: Array.from(menuItems).map(describeMenuItem),
+    };
+  }
+
+  function loadIconDebugFlag() {
+    try {
+      iconDebugEnabled = window.localStorage.getItem(ICON_DEBUG_STORAGE_KEY) === '1';
+    } catch (err) {
+      iconDebugEnabled = false;
+    }
+  }
+
+  function setIconDebugEnabled(enabled) {
+    iconDebugEnabled = Boolean(enabled);
+    try {
+      if (iconDebugEnabled) window.localStorage.setItem(ICON_DEBUG_STORAGE_KEY, '1');
+      else window.localStorage.removeItem(ICON_DEBUG_STORAGE_KEY);
+    } catch (err) {
+      // Ignore storage access errors.
+    }
+    console.info('[twblock] icon debug ' + (iconDebugEnabled ? 'enabled' : 'disabled'));
+  }
+
+  function logIconDebugSnapshot(snapshot) {
+    const rows = snapshot.entries.map((entry) => ({
+      text: entry.text,
+      signature: entry.signature,
+      signatureMatch: entry.signatureMatch,
+      labelMatch: entry.labelMatch,
+      matchedBy: entry.matchedBy,
+    }));
+    console.groupCollapsed('[twblock] icon debug: ' + snapshot.reason);
+    if (rows.length) console.table(rows);
+    else console.info('[twblock] no menu items found');
+    console.log(snapshot);
+    console.groupEnd();
+  }
+
+  function recordIconDebugSnapshot(snapshot) {
+    iconDebugHistory.push(snapshot);
+    if (iconDebugHistory.length > MAX_ICON_DEBUG_HISTORY) {
+      iconDebugHistory.shift();
+    }
+    if (iconDebugEnabled) logIconDebugSnapshot(snapshot);
+  }
+
+  function dumpCurrentMenuIcons(reason) {
+    const snapshot = buildMenuIconSnapshot(document.querySelectorAll('[role="menuitem"]'), reason || 'manual-dump');
+    recordIconDebugSnapshot(snapshot);
+    return snapshot;
+  }
+
+  function installIconDebugHooks() {
+    if (window.__twblockIconDebugHooksInstalled) return;
+    window.__twblockIconDebugHooksInstalled = true;
+
+    window.addEventListener('twblock:debug-icons', (event) => {
+      const action = event.detail && typeof event.detail.action === 'string'
+        ? event.detail.action
+        : 'dump';
+
+      if (action === 'on') {
+        setIconDebugEnabled(true);
+        return;
+      }
+      if (action === 'off') {
+        setIconDebugEnabled(false);
+        return;
+      }
+      if (action === 'history') {
+        console.log(iconDebugHistory.slice());
+        return;
+      }
+
+      dumpCurrentMenuIcons('manual-' + action);
+    });
   }
 
   function getIcon(action) {
@@ -106,9 +391,10 @@
   function loadStoredIcons() {
     return new Promise((resolve) => {
       chrome.storage.local.get('icons', (data) => {
-        if (data.icons && data.icons.version === ICON_CACHE_VERSION) {
+        if (data.icons) {
           if (data.icons.block) BLOCK_ICON = data.icons.block;
           if (data.icons.mute) MUTE_ICON = data.icons.mute;
+          loadStoredIconSignatures(data.icons.signatures);
           iconsExtracted = Boolean(BLOCK_ICON && MUTE_ICON);
         }
         resolve();
@@ -142,35 +428,53 @@
 
   // メニューアイテムからBlock/MuteのSVGを抽出する共通ロジック
   function extractIconsFromMenuItems(menuItems) {
+    const snapshot = buildMenuIconSnapshot(menuItems, 'extract');
     let foundBlock = false;
     let foundMute = false;
     let nextBlockIcon = BLOCK_ICON;
     let nextMuteIcon = MUTE_ICON;
 
-    for (const item of menuItems) {
-      const text = item.textContent || '';
-      const pathEl = item.querySelector('svg path');
-      if (!pathEl) continue;
-      const d = pathEl.getAttribute('d');
-      if (!d) continue;
+    for (const entry of snapshot.entries) {
+      if (!entry.iconMarkup) continue;
 
-      if (!foundBlock && BLOCK_MENU_LABEL_RE.test(text) && !UNBLOCK_MENU_LABEL_RE.test(text)) {
-        nextBlockIcon = '<svg viewBox="0 0 24 24" width="20" height="20"><path d="' + escapeAttr(d) + '" fill="currentColor"/></svg>';
+      if (!foundBlock && entry.signatureMatch === 'block') {
+        nextBlockIcon = entry.iconMarkup;
         foundBlock = true;
+        entry.matchedBy = 'signature:block';
+        rememberIconSignature('block', entry.signature);
       }
-      if (!foundMute && MUTE_MENU_LABEL_RE.test(text) &&
-          !UNMUTE_MENU_LABEL_RE.test(text) &&
-          !CONVERSATION_MENU_LABEL_RE.test(text)) {
-        nextMuteIcon = '<svg viewBox="0 0 24 24" width="20" height="20"><path d="' + escapeAttr(d) + '" fill="currentColor"/></svg>';
+      if (!foundMute && entry.signatureMatch === 'mute') {
+        nextMuteIcon = entry.iconMarkup;
         foundMute = true;
+        entry.matchedBy = 'signature:mute';
+        rememberIconSignature('mute', entry.signature);
+      }
+
+      if (!foundBlock && entry.labelMatch === 'block') {
+        nextBlockIcon = entry.iconMarkup;
+        foundBlock = true;
+        entry.matchedBy = 'label:block';
+        rememberIconSignature('block', entry.signature);
+      }
+      if (!foundMute && entry.labelMatch === 'mute') {
+        nextMuteIcon = entry.iconMarkup;
+        foundMute = true;
+        entry.matchedBy = 'label:mute';
+        rememberIconSignature('mute', entry.signature);
       }
     }
+
+    snapshot.foundBlock = foundBlock;
+    snapshot.foundMute = foundMute;
+    snapshot.blockSignatureCount = BLOCK_ICON_SIGNATURES.size;
+    snapshot.muteSignatureCount = MUTE_ICON_SIGNATURES.size;
+    recordIconDebugSnapshot(snapshot);
 
     if (foundBlock || foundMute) {
       if (foundBlock) BLOCK_ICON = nextBlockIcon;
       if (foundMute) MUTE_ICON = nextMuteIcon;
       iconsExtracted = Boolean(BLOCK_ICON && MUTE_ICON);
-      chrome.storage.local.set({ icons: { version: ICON_CACHE_VERSION, block: BLOCK_ICON, mute: MUTE_ICON } });
+      persistIcons();
       replaceAllButtonIcons();
     }
   }
@@ -289,8 +593,51 @@
     });
   }
 
+  const attributedStatusAuthors = new Map();
+  const pendingAttributedStatusAuthors = new Map();
+
+  function resolveStatusAuthorScreenName(statusId) {
+    if (attributedStatusAuthors.has(statusId)) {
+      return Promise.resolve(attributedStatusAuthors.get(statusId));
+    }
+
+    const inFlight = pendingAttributedStatusAuthors.get(statusId);
+    if (inFlight) return inFlight;
+
+    const request = new Promise((resolve) => {
+      const id = '__twb_' + ++reqId;
+      pending.set(id, (result) => {
+        const screenName = typeof result?.screenName === 'string' ? result.screenName : null;
+        if (screenName) {
+          attributedStatusAuthors.set(statusId, screenName);
+        }
+        pendingAttributedStatusAuthors.delete(statusId);
+        resolve(screenName);
+      });
+      window.postMessage(
+        { type: '__TWBLOCK_RESOLVE_STATUS_AUTHOR', statusId, requestId: id },
+        '*'
+      );
+      setTimeout(() => {
+        if (pending.has(id)) {
+          pending.delete(id);
+          pendingAttributedStatusAuthors.delete(statusId);
+          resolve(null);
+        }
+      }, 10000);
+    });
+
+    pendingAttributedStatusAuthors.set(statusId, request);
+    return request;
+  }
+
   window.addEventListener('message', (e) => {
-    if (e.source !== window || !e.data || e.data.type !== '__TWBLOCK_RESULT') return;
+    if (e.source !== window || !e.data) return;
+    if (e.data.type === '__TWBLOCK_STATUS_AUTHORS_UPDATED') {
+      setTimeout(processAttributedTweets, 0);
+      return;
+    }
+    if (e.data.type !== '__TWBLOCK_RESULT') return;
     const cb = pending.get(e.data.requestId);
     if (cb) {
       pending.delete(e.data.requestId);
@@ -593,6 +940,126 @@
     return btn;
   }
 
+  function syncResolvedScreenName(container, screenName) {
+    if (!container || !screenName) return;
+
+    container.setAttribute('data-screen-name', screenName);
+
+    container.querySelectorAll('.twblock-btn').forEach((btn) => {
+      const action = btn.classList.contains('twblock-block') ? 'block' : 'mute';
+      const label = action === 'block' ? msg('blockLabel') : msg('muteLabel');
+      btn._screenName = screenName;
+
+      if (!btn._isActive) {
+        btn.setAttribute('aria-label', label + ' @' + screenName);
+        btn.title = label + ' @' + screenName;
+      }
+    });
+  }
+
+  function createAttributionButtons(statusId, displayName) {
+    if (!showBlock && !showMute) return null;
+
+    const container = document.createElement('div');
+    container.className = 'twblock-btn-container';
+    container.setAttribute('data-status-id', statusId);
+
+    if (showBlock) {
+      container.appendChild(createAttributionButton(statusId, 'block', msg('blockLabel'), displayName));
+    }
+    if (showMute) {
+      container.appendChild(createAttributionButton(statusId, 'mute', msg('muteLabel'), displayName));
+    }
+
+    return container;
+  }
+
+  function createAttributionButton(statusId, action, label, displayName) {
+    const btn = document.createElement('button');
+    btn.className = 'twblock-btn twblock-' + action;
+    btn.setAttribute('aria-label', displayName ? label + ' ' + displayName : label);
+    btn.title = displayName ? label + ' ' + displayName : label;
+    btn.innerHTML = getIcon(action);
+
+    btn._isActive = false;
+    btn._screenName = null;
+    const undoAction = action === 'block' ? 'unblock' : 'unmute';
+
+    btn.addEventListener('click', async (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      if (btn.disabled) return;
+
+      btn.disabled = true;
+      btn.classList.add('twblock-loading');
+
+      let screenName = btn._screenName;
+      if (!screenName) {
+        screenName = await resolveStatusAuthorScreenName(statusId);
+        if (screenName) {
+          syncResolvedScreenName(btn.closest('.twblock-btn-container'), screenName);
+        }
+      }
+
+      if (!screenName) {
+        btn.classList.remove('twblock-loading');
+        btn.classList.add('twblock-error');
+        btn.title = msg('errorOccurred');
+        btn.disabled = false;
+        setTimeout(() => btn.classList.remove('twblock-error'), 3000);
+        return;
+      }
+
+      const currentAction = btn._isActive ? undoAction : action;
+
+      if (confirmBlockFollowing && action === 'block' && !btn._isActive) {
+        const followResult = await checkFollowing(screenName);
+        if (followResult.following) {
+          btn.classList.remove('twblock-loading');
+          btn.disabled = false;
+          if (!confirm(msg('confirmBlockFollowing', screenName))) return;
+          btn.disabled = true;
+          btn.classList.add('twblock-loading');
+        }
+      }
+
+      const result = await sendAction(currentAction, screenName);
+      btn.classList.remove('twblock-loading');
+
+      if (result.success) {
+        if (!btn._isActive) {
+          btn._isActive = true;
+          btn.classList.add('twblock-success');
+          btn.innerHTML = CHECK_ICON;
+          btn.title = (action === 'block' ? msg('blockedStatus') : msg('mutedStatus')) + ' @' + screenName;
+          btn.disabled = false;
+          addBlockedUser(screenName, action);
+          chrome.runtime.sendMessage({ type: 'ACTION_COMPLETED', action }).catch(() => {});
+          showToast(msg(action === 'block' ? 'toastBlocked' : 'toastMuted', screenName));
+
+          const parentTweet = btn.closest('article[data-testid="tweet"]');
+          if (parentTweet) {
+            setTimeout(() => hideTweet(parentTweet, screenName, action), 300);
+          }
+        } else {
+          btn._isActive = false;
+          btn.classList.remove('twblock-success');
+          btn.innerHTML = getIcon(action);
+          btn.title = label + ' @' + screenName;
+          removeBlockedUser(screenName, action);
+          btn.disabled = false;
+        }
+      } else {
+        btn.classList.add('twblock-error');
+        btn.title = result.message || msg('errorOccurred');
+        btn.disabled = false;
+        setTimeout(() => btn.classList.remove('twblock-error'), 3000);
+      }
+    });
+
+    return btn;
+  }
+
   // ---- Grok/caretの行を見つけて、その中にボタンを挿入 ----
   function findGrokRow(tweet) {
     const caret = tweet.querySelector('[data-testid="caret"]');
@@ -638,6 +1105,22 @@
     return { retweeter: href.substring(1), scRow, scLinkParent };
   }
 
+  function extractAttributionInfo(tweet) {
+    const statusLink = tweet.querySelector('a[href^="/i/status/"]');
+    if (!statusLink) return null;
+
+    const href = statusLink.getAttribute('href');
+    const match = href && href.match(/^\/i\/status\/(\d+)$/);
+    if (!match) return null;
+
+    const row = statusLink.parentElement;
+    if (!row) return null;
+
+    const displayName = statusLink.textContent ? statusLink.textContent.trim() : '';
+
+    return { statusId: match[1], row, displayName };
+  }
+
   // ツイート本文エリアからscreen_nameを抽出（socialContext内のリンクを除外）
   function extractAuthorScreenName(tweet) {
     const userName = tweet.querySelector('[data-testid="User-Name"]');
@@ -646,6 +1129,57 @@
       if (result) return result;
     }
     return null;
+  }
+
+  function processAttributedTweet(tweet, me, authorName) {
+    const info = extractAttributionInfo(tweet);
+    if (!info) return;
+
+    const { statusId, row, displayName } = info;
+    if (!row.isConnected || row.getAttribute(ATTRIBUTION_PROCESSED) === '1') {
+      return;
+    }
+
+    let buttons = row.querySelector('.twblock-btn-container.twblock-attribution');
+    if (!buttons) {
+      buttons = createAttributionButtons(statusId, displayName);
+      if (!buttons) return;
+      buttons.classList.add('twblock-tweet', 'twblock-repost', 'twblock-attribution');
+      row.classList.add('twblock-repost-row', 'twblock-attribution-row');
+      row.appendChild(buttons);
+    }
+
+    row.setAttribute(ATTRIBUTION_PROCESSED, 'pending');
+
+    resolveStatusAuthorScreenName(statusId).then((attributedScreenName) => {
+      if (!row.isConnected || !buttons.isConnected) return;
+      if (!attributedScreenName) {
+        row.setAttribute(ATTRIBUTION_PROCESSED, 'pending');
+        return;
+      }
+
+      if (attributedScreenName === me || attributedScreenName === authorName) {
+        buttons.remove();
+        row.setAttribute(ATTRIBUTION_PROCESSED, '1');
+        return;
+      }
+
+      syncResolvedScreenName(buttons, attributedScreenName);
+      row.setAttribute(ATTRIBUTION_PROCESSED, '1');
+
+      const blockedAction = blockedUsers.get(attributedScreenName);
+      if (blockedAction) {
+        const activeBtn = buttons.querySelector('.twblock-' + blockedAction + ':not(.twblock-success)');
+        if (activeBtn) {
+          activeBtn._isActive = true;
+          activeBtn.classList.add('twblock-success');
+          activeBtn.innerHTML = CHECK_ICON;
+        }
+        if (!isViewingProfileTimeline(attributedScreenName)) {
+          hideTweet(tweet, attributedScreenName, blockedAction);
+        }
+      }
+    });
   }
 
   // ---- ボタン挿入: タイムラインツイート ----
@@ -733,6 +1267,16 @@
       } catch (e) {
         tweet.removeAttribute(PROCESSED);
       }
+    });
+  }
+
+  function processAttributedTweets() {
+    const me = getMyScreenName();
+    const tweets = document.querySelectorAll('article[data-testid="tweet"]');
+
+    tweets.forEach((tweet) => {
+      const authorName = extractAuthorScreenName(tweet) || extractScreenName(tweet);
+      processAttributedTweet(tweet, me, authorName);
     });
   }
 
@@ -925,6 +1469,7 @@
   // ---- メイン処理 ----
   function processAll() {
     processTweets();
+    processAttributedTweets();
     processFollowButtons();
     processTypeahead();
   }
@@ -966,6 +1511,7 @@
       const newIcons = changes.icons.newValue || {};
       if (newIcons.block) BLOCK_ICON = newIcons.block;
       if (newIcons.mute) MUTE_ICON = newIcons.mute;
+      loadStoredIconSignatures(newIcons.signatures);
       iconsExtracted = Boolean(BLOCK_ICON && MUTE_ICON);
       replaceAllButtonIcons();
     }
@@ -974,6 +1520,8 @@
   // ---- 初期化 ----
   async function init() {
     cacheI18n();
+    loadIconDebugFlag();
+    installIconDebugHooks();
     injectPageScript();
     await loadStoredIcons();
     await loadSettings();

@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Ultimate Twitter Block
 // @namespace    twitter-block-userscript
-// @version      2.1.0
+// @version      2.2.0
 // @description  Add one-click block/mute buttons to tweets, profiles, and search suggestions on Twitter/X
 // @author       nemut.ai
 // @match        https://x.com/*
@@ -18,6 +18,7 @@
   window.__twblockInjected = true;
 
   const PROCESSED = 'data-twblock';
+  const ATTRIBUTION_PROCESSED = 'data-twblock-attribution';
   const RESERVED_PATHS = new Set([
     'home', 'explore', 'search', 'notifications', 'messages',
     'settings', 'i', 'compose', 'login', 'logout', 'signup',
@@ -27,12 +28,27 @@
     'with_replies', 'media', 'likes', 'highlights', 'articles',
     'followers', 'following', 'verified_followers',
   ]);
-  const ICON_CACHE_VERSION = 3;
+  const ICON_CACHE_VERSION = 4;
   const BLOCK_MENU_LABEL_RE = /\bBlock\b|ブロック|屏蔽/;
   const UNBLOCK_MENU_LABEL_RE = /\bUnblock\b|ブロック解除|取消屏蔽/;
   const MUTE_MENU_LABEL_RE = /\bMute\b|ミュート|隐藏/;
   const UNMUTE_MENU_LABEL_RE = /\bUnmute\b|ミュート解除|取消隐藏/;
   const CONVERSATION_MENU_LABEL_RE = /\bconversation\b|会話|对话|此对话/;
+  const SVG_NS = 'http://www.w3.org/2000/svg';
+  const ICON_DEBUG_STORAGE_KEY = 'twblock:debug-icons';
+  const MAX_ICON_DEBUG_HISTORY = 20;
+  const BLOCK_ICON_SIGNATURES = new Set(['498278e7']);
+  const MUTE_ICON_SIGNATURES = new Set(['d3853445']);
+  const ICON_SHAPE_ATTRS = {
+    path: ['d', 'transform', 'fill-rule', 'clip-rule', 'stroke-width', 'stroke-linecap', 'stroke-linejoin', 'stroke-miterlimit'],
+    circle: ['cx', 'cy', 'r', 'transform', 'stroke-width'],
+    ellipse: ['cx', 'cy', 'rx', 'ry', 'transform', 'stroke-width'],
+    rect: ['x', 'y', 'width', 'height', 'rx', 'ry', 'transform', 'stroke-width'],
+    line: ['x1', 'y1', 'x2', 'y2', 'transform', 'stroke-width', 'stroke-linecap'],
+    polyline: ['points', 'transform', 'stroke-width', 'stroke-linecap', 'stroke-linejoin'],
+    polygon: ['points', 'transform', 'stroke-width', 'stroke-linejoin', 'fill-rule', 'clip-rule'],
+  };
+  const ICON_GROUP_ATTRS = ['transform'];
   const FALLBACK_BLOCK_ICON =
     '<svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true">' +
     '<circle cx="12" cy="12" r="8" stroke="currentColor" stroke-width="1.8" fill="none"/>' +
@@ -47,12 +63,281 @@
   // ---- SVGアイコン（ストレージ or パッシブ取得で動的設定） ----
   let BLOCK_ICON = '';
   let MUTE_ICON = '';
+  let iconDebugEnabled = false;
+  const iconDebugHistory = [];
 
   const CHECK_ICON =
     '<svg viewBox="0 0 24 24" width="20" height="20"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41L9 16.17z" fill="currentColor"/></svg>';
 
   function escapeAttr(s) {
     return s.replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  }
+
+  function normalizeSpace(value) {
+    return String(value || '').replace(/\s+/g, ' ').trim();
+  }
+
+  function hashString(value) {
+    let hash = 2166136261;
+    for (let i = 0; i < value.length; i++) {
+      hash ^= value.charCodeAt(i);
+      hash = Math.imul(hash, 16777619);
+    }
+    return (hash >>> 0).toString(16).padStart(8, '0');
+  }
+
+  function getIconSignatureSet(action) {
+    return action === 'block' ? BLOCK_ICON_SIGNATURES : MUTE_ICON_SIGNATURES;
+  }
+
+  function rememberIconSignature(action, signature) {
+    if (!signature) return;
+    getIconSignatureSet(action).add(signature);
+  }
+
+  function loadStoredIconSignatures(signatures) {
+    if (!signatures || typeof signatures !== 'object') return;
+    ['block', 'mute'].forEach((action) => {
+      const values = Array.isArray(signatures[action]) ? signatures[action] : [];
+      values.forEach((value) => {
+        if (typeof value === 'string' && value) rememberIconSignature(action, value);
+      });
+    });
+  }
+
+  function getStoredIconSignatures() {
+    return {
+      block: Array.from(BLOCK_ICON_SIGNATURES),
+      mute: Array.from(MUTE_ICON_SIGNATURES),
+    };
+  }
+
+  function persistIcons() {
+    chrome.storage.local.set({
+      icons: {
+        version: ICON_CACHE_VERSION,
+        block: BLOCK_ICON,
+        mute: MUTE_ICON,
+        signatures: getStoredIconSignatures(),
+      },
+    });
+  }
+
+  function getPaintState(node, attrName) {
+    const tag = node.tagName.toLowerCase();
+    const value = normalizeSpace(node.getAttribute(attrName));
+    if (attrName === 'fill') {
+      const strokeValue = normalizeSpace(node.getAttribute('stroke'));
+      const hasVisibleStroke = strokeValue && strokeValue !== 'none';
+      if (node.hasAttribute('fill')) return value === 'none' ? 'none' : 'paint';
+      return (tag === 'line' || hasVisibleStroke) ? 'none' : 'paint';
+    }
+    if (!node.hasAttribute('stroke')) return 'none';
+    return value === 'none' ? 'none' : 'paint';
+  }
+
+  function appendIconSignatureParts(node, parts) {
+    Array.from(node.children).forEach((child) => {
+      const tag = child.tagName.toLowerCase();
+      if (tag === 'g') {
+        const transform = normalizeSpace(child.getAttribute('transform'));
+        if (transform) parts.push('g:transform=' + transform);
+        appendIconSignatureParts(child, parts);
+        if (transform) parts.push('/g');
+        return;
+      }
+
+      const attrs = ICON_SHAPE_ATTRS[tag];
+      if (!attrs) return;
+
+      const attrParts = [];
+      attrs.forEach((attr) => {
+        const value = normalizeSpace(child.getAttribute(attr));
+        if (value) attrParts.push(attr + '=' + value);
+      });
+      attrParts.push('fill=' + getPaintState(child, 'fill'));
+      attrParts.push('stroke=' + getPaintState(child, 'stroke'));
+      parts.push(tag + ':' + attrParts.join(','));
+    });
+  }
+
+  function getIconSignature(svgEl) {
+    if (!svgEl) return '';
+    const parts = ['viewBox=' + (normalizeSpace(svgEl.getAttribute('viewBox')) || '0 0 24 24')];
+    appendIconSignatureParts(svgEl, parts);
+    return hashString(parts.join('|'));
+  }
+
+  function copySvgAttributes(source, target, attrs) {
+    attrs.forEach((attr) => {
+      const value = normalizeSpace(source.getAttribute(attr));
+      if (value) target.setAttribute(attr, value);
+    });
+  }
+
+  function applySanitizedPaint(source, target) {
+    const tag = source.tagName.toLowerCase();
+    const fillValue = normalizeSpace(source.getAttribute('fill'));
+    const strokeValue = normalizeSpace(source.getAttribute('stroke'));
+    const hasVisibleStroke = strokeValue && strokeValue !== 'none';
+
+    if (source.hasAttribute('fill')) {
+      target.setAttribute('fill', fillValue === 'none' ? 'none' : 'currentColor');
+    } else if (tag === 'line' || hasVisibleStroke) {
+      target.setAttribute('fill', 'none');
+    } else {
+      target.setAttribute('fill', 'currentColor');
+    }
+
+    if (source.hasAttribute('stroke')) {
+      target.setAttribute('stroke', strokeValue === 'none' ? 'none' : 'currentColor');
+    }
+  }
+
+  function sanitizeSvgNode(node) {
+    const tag = node.tagName.toLowerCase();
+
+    if (tag === 'g') {
+      const group = document.createElementNS(SVG_NS, 'g');
+      copySvgAttributes(node, group, ICON_GROUP_ATTRS);
+      Array.from(node.children).forEach((child) => {
+        const sanitizedChild = sanitizeSvgNode(child);
+        if (sanitizedChild) group.appendChild(sanitizedChild);
+      });
+      return (group.childNodes.length || group.attributes.length) ? group : null;
+    }
+
+    const attrs = ICON_SHAPE_ATTRS[tag];
+    if (!attrs) return null;
+
+    const sanitized = document.createElementNS(SVG_NS, tag);
+    copySvgAttributes(node, sanitized, attrs);
+    applySanitizedPaint(node, sanitized);
+    return sanitized;
+  }
+
+  function buildInlineIconSvg(svgEl) {
+    if (!svgEl) return '';
+    const svg = document.createElementNS(SVG_NS, 'svg');
+    svg.setAttribute('viewBox', normalizeSpace(svgEl.getAttribute('viewBox')) || '0 0 24 24');
+    svg.setAttribute('width', '20');
+    svg.setAttribute('height', '20');
+    svg.setAttribute('aria-hidden', 'true');
+    Array.from(svgEl.children).forEach((child) => {
+      const sanitizedChild = sanitizeSvgNode(child);
+      if (sanitizedChild) svg.appendChild(sanitizedChild);
+    });
+    return svg.childNodes.length ? svg.outerHTML : '';
+  }
+
+  function getMenuItemLabelMatch(text) {
+    if (BLOCK_MENU_LABEL_RE.test(text) && !UNBLOCK_MENU_LABEL_RE.test(text)) return 'block';
+    if (MUTE_MENU_LABEL_RE.test(text) &&
+        !UNMUTE_MENU_LABEL_RE.test(text) &&
+        !CONVERSATION_MENU_LABEL_RE.test(text)) return 'mute';
+    return '';
+  }
+
+  function describeMenuItem(item) {
+    const text = normalizeSpace(item.textContent || '');
+    const svgEl = item.querySelector('svg');
+    const signature = getIconSignature(svgEl);
+    let signatureMatch = '';
+    if (signature) {
+      if (BLOCK_ICON_SIGNATURES.has(signature)) signatureMatch = 'block';
+      else if (MUTE_ICON_SIGNATURES.has(signature)) signatureMatch = 'mute';
+    }
+
+    return {
+      text,
+      signature,
+      signatureMatch,
+      labelMatch: getMenuItemLabelMatch(text),
+      matchedBy: '',
+      iconMarkup: buildInlineIconSvg(svgEl),
+    };
+  }
+
+  function buildMenuIconSnapshot(menuItems, reason) {
+    return {
+      reason,
+      timestamp: new Date().toISOString(),
+      entries: Array.from(menuItems).map(describeMenuItem),
+    };
+  }
+
+  function loadIconDebugFlag() {
+    try {
+      iconDebugEnabled = window.localStorage.getItem(ICON_DEBUG_STORAGE_KEY) === '1';
+    } catch (err) {
+      iconDebugEnabled = false;
+    }
+  }
+
+  function setIconDebugEnabled(enabled) {
+    iconDebugEnabled = Boolean(enabled);
+    try {
+      if (iconDebugEnabled) window.localStorage.setItem(ICON_DEBUG_STORAGE_KEY, '1');
+      else window.localStorage.removeItem(ICON_DEBUG_STORAGE_KEY);
+    } catch (err) {
+      // Ignore storage access errors.
+    }
+    console.info('[twblock] icon debug ' + (iconDebugEnabled ? 'enabled' : 'disabled'));
+  }
+
+  function logIconDebugSnapshot(snapshot) {
+    const rows = snapshot.entries.map((entry) => ({
+      text: entry.text,
+      signature: entry.signature,
+      signatureMatch: entry.signatureMatch,
+      labelMatch: entry.labelMatch,
+      matchedBy: entry.matchedBy,
+    }));
+    console.groupCollapsed('[twblock] icon debug: ' + snapshot.reason);
+    if (rows.length) console.table(rows);
+    else console.info('[twblock] no menu items found');
+    console.log(snapshot);
+    console.groupEnd();
+  }
+
+  function recordIconDebugSnapshot(snapshot) {
+    iconDebugHistory.push(snapshot);
+    if (iconDebugHistory.length > MAX_ICON_DEBUG_HISTORY) {
+      iconDebugHistory.shift();
+    }
+    if (iconDebugEnabled) logIconDebugSnapshot(snapshot);
+  }
+
+  function dumpCurrentMenuIcons(reason) {
+    const snapshot = buildMenuIconSnapshot(document.querySelectorAll('[role="menuitem"]'), reason || 'manual-dump');
+    recordIconDebugSnapshot(snapshot);
+    return snapshot;
+  }
+
+  function installIconDebugHooks() {
+    if (window.__twblockIconDebugHooksInstalled) return;
+    window.__twblockIconDebugHooksInstalled = true;
+
+    window.addEventListener('twblock:debug-icons', (event) => {
+      const action = event.detail && typeof event.detail.action === 'string'
+        ? event.detail.action
+        : 'dump';
+
+      if (action === 'on') {
+        setIconDebugEnabled(true);
+        return;
+      }
+      if (action === 'off') {
+        setIconDebugEnabled(false);
+        return;
+      }
+      if (action === 'history') {
+        console.log(iconDebugHistory.slice());
+        return;
+      }
+
+      dumpCurrentMenuIcons('manual-' + action);
+    });
   }
 
   function getIcon(action) {
@@ -161,35 +446,53 @@
 
   // メニューアイテムからBlock/MuteのSVGを抽出する共通ロジック
   function extractIconsFromMenuItems(menuItems) {
+    const snapshot = buildMenuIconSnapshot(menuItems, 'extract');
     let foundBlock = false;
     let foundMute = false;
     let nextBlockIcon = BLOCK_ICON;
     let nextMuteIcon = MUTE_ICON;
 
-    for (const item of menuItems) {
-      const text = item.textContent || '';
-      const pathEl = item.querySelector('svg path');
-      if (!pathEl) continue;
-      const d = pathEl.getAttribute('d');
-      if (!d) continue;
+    for (const entry of snapshot.entries) {
+      if (!entry.iconMarkup) continue;
 
-      if (!foundBlock && BLOCK_MENU_LABEL_RE.test(text) && !UNBLOCK_MENU_LABEL_RE.test(text)) {
-        nextBlockIcon = '<svg viewBox="0 0 24 24" width="20" height="20"><path d="' + escapeAttr(d) + '" fill="currentColor"/></svg>';
+      if (!foundBlock && entry.signatureMatch === 'block') {
+        nextBlockIcon = entry.iconMarkup;
         foundBlock = true;
+        entry.matchedBy = 'signature:block';
+        rememberIconSignature('block', entry.signature);
       }
-      if (!foundMute && MUTE_MENU_LABEL_RE.test(text) &&
-          !UNMUTE_MENU_LABEL_RE.test(text) &&
-          !CONVERSATION_MENU_LABEL_RE.test(text)) {
-        nextMuteIcon = '<svg viewBox="0 0 24 24" width="20" height="20"><path d="' + escapeAttr(d) + '" fill="currentColor"/></svg>';
+      if (!foundMute && entry.signatureMatch === 'mute') {
+        nextMuteIcon = entry.iconMarkup;
         foundMute = true;
+        entry.matchedBy = 'signature:mute';
+        rememberIconSignature('mute', entry.signature);
+      }
+
+      if (!foundBlock && entry.labelMatch === 'block') {
+        nextBlockIcon = entry.iconMarkup;
+        foundBlock = true;
+        entry.matchedBy = 'label:block';
+        rememberIconSignature('block', entry.signature);
+      }
+      if (!foundMute && entry.labelMatch === 'mute') {
+        nextMuteIcon = entry.iconMarkup;
+        foundMute = true;
+        entry.matchedBy = 'label:mute';
+        rememberIconSignature('mute', entry.signature);
       }
     }
+
+    snapshot.foundBlock = foundBlock;
+    snapshot.foundMute = foundMute;
+    snapshot.blockSignatureCount = BLOCK_ICON_SIGNATURES.size;
+    snapshot.muteSignatureCount = MUTE_ICON_SIGNATURES.size;
+    recordIconDebugSnapshot(snapshot);
 
     if (foundBlock || foundMute) {
       if (foundBlock) BLOCK_ICON = nextBlockIcon;
       if (foundMute) MUTE_ICON = nextMuteIcon;
       iconsExtracted = Boolean(BLOCK_ICON && MUTE_ICON);
-      localStorage.setItem('twblock_icons', JSON.stringify({ version: ICON_CACHE_VERSION, block: BLOCK_ICON, mute: MUTE_ICON }));
+      persistIcons();
       replaceAllButtonIcons();
     }
   }
@@ -267,6 +570,157 @@
   'use strict';
 
   let capturedHeaders = null;
+  const statusAuthorMap = new Map();
+  const pendingStatusAuthorWaiters = new Map();
+  let statusAuthorUpdateScheduled = false;
+
+  function scheduleStatusAuthorUpdate() {
+    if (statusAuthorUpdateScheduled) return;
+    statusAuthorUpdateScheduled = true;
+    setTimeout(() => {
+      statusAuthorUpdateScheduled = false;
+      window.postMessage({ type: '__TWBLOCK_STATUS_AUTHORS_UPDATED' }, '*');
+    }, 0);
+  }
+
+  function notifyStatusAuthorResolved(statusId, screenName) {
+    const waiters = pendingStatusAuthorWaiters.get(statusId);
+    if (!waiters) return;
+    pendingStatusAuthorWaiters.delete(statusId);
+    for (const resolve of waiters) resolve(screenName);
+  }
+
+  function rememberStatusAuthor(statusId, screenName) {
+    if (!/^\d+$/.test(statusId) || !/^[A-Za-z0-9_]{1,15}$/.test(screenName)) {
+      return false;
+    }
+    if (statusAuthorMap.get(statusId) === screenName) {
+      return false;
+    }
+    statusAuthorMap.set(statusId, screenName);
+    notifyStatusAuthorResolved(statusId, screenName);
+    scheduleStatusAuthorUpdate();
+    return true;
+  }
+
+  function extractTweetScreenName(node) {
+    return (
+      node?.user?.screen_name ||
+      node?.core?.user_results?.result?.legacy?.screen_name ||
+      node?.core?.user_results?.result?.screen_name ||
+      null
+    );
+  }
+
+  function extractTweetIds(node) {
+    const ids = [
+      node?.rest_id,
+      node?.legacy?.id_str,
+      node?.id_str,
+    ];
+    return ids.filter((id, index) => typeof id === 'string' && /^\d+$/.test(id) && ids.indexOf(id) === index);
+  }
+
+  function isTweetLikeNode(node) {
+    return Boolean(
+      node &&
+      typeof node === 'object' &&
+      (
+        node.__typename === 'Tweet' ||
+        node.__typename === 'TweetWithVisibilityResults' ||
+        node.user ||
+        node.core?.user_results ||
+        node.legacy?.conversation_id_str ||
+        node.legacy?.user_id_str ||
+        node.legacy?.full_text
+      )
+    );
+  }
+
+  function indexStatusAuthors(payload) {
+    if (!payload || typeof payload !== 'object') return;
+
+    const stack = [payload];
+    const seen = new Set();
+
+    while (stack.length) {
+      const node = stack.pop();
+      if (!node || typeof node !== 'object' || seen.has(node)) continue;
+      seen.add(node);
+
+      if (isTweetLikeNode(node)) {
+        const screenName = extractTweetScreenName(node);
+        if (screenName) {
+          for (const statusId of extractTweetIds(node)) {
+            rememberStatusAuthor(statusId, screenName);
+          }
+        }
+      }
+
+      if (Array.isArray(node)) {
+        for (const value of node) {
+          if (value && typeof value === 'object') stack.push(value);
+        }
+        continue;
+      }
+
+      for (const value of Object.values(node)) {
+        if (value && typeof value === 'object') stack.push(value);
+      }
+    }
+  }
+
+  function captureHeaders(headers) {
+    if (!headers) return;
+    const normalized = {};
+    for (const [key, value] of Object.entries(headers)) {
+      normalized[String(key).toLowerCase()] = value;
+    }
+    if (!normalized.authorization || !normalized['x-csrf-token']) return;
+    capturedHeaders = {
+      authorization: normalized.authorization,
+      'x-csrf-token': normalized['x-csrf-token'],
+      'x-twitter-active-user': normalized['x-twitter-active-user'] || 'yes',
+      'x-twitter-auth-type': normalized['x-twitter-auth-type'] || 'OAuth2Session',
+      'x-twitter-client-language': normalized['x-twitter-client-language'] || document.documentElement.lang || 'en',
+    };
+  }
+
+  function maybeIndexApiResponse(url, response) {
+    if (typeof url !== 'string' || !url.includes('/i/api/') || !response?.ok) {
+      return;
+    }
+
+    const contentType = response.headers?.get('content-type') || '';
+    if (!contentType.includes('application/json')) return;
+
+    response.clone().json()
+      .then((data) => { indexStatusAuthors(data); })
+      .catch(() => {});
+  }
+
+  function waitForStatusAuthor(statusId, timeoutMs) {
+    if (statusAuthorMap.has(statusId)) {
+      return Promise.resolve(statusAuthorMap.get(statusId));
+    }
+
+    return new Promise((resolve) => {
+      const waiters = pendingStatusAuthorWaiters.get(statusId) || [];
+      waiters.push(resolve);
+      pendingStatusAuthorWaiters.set(statusId, waiters);
+
+      setTimeout(() => {
+        const current = pendingStatusAuthorWaiters.get(statusId);
+        if (!current) return;
+        const index = current.indexOf(resolve);
+        if (index >= 0) current.splice(index, 1);
+        if (current.length === 0) {
+          pendingStatusAuthorWaiters.delete(statusId);
+        }
+        resolve(null);
+      }, timeoutMs);
+    });
+  }
 
   // Twitterのfetchをインターセプトして認証ヘッダーを取得
   const originalFetch = window.fetch;
@@ -278,15 +732,14 @@
           options.headers instanceof Headers
             ? Object.fromEntries(options.headers.entries())
             : options.headers;
-        if (headers['authorization'] && headers['x-csrf-token']) {
-          capturedHeaders = {
-            authorization: headers['authorization'],
-            'x-csrf-token': headers['x-csrf-token'],
-          };
-        }
+        captureHeaders(headers);
       }
     }
-    return originalFetch.apply(this, args);
+    const responsePromise = originalFetch.apply(this, args);
+    responsePromise.then((response) => {
+      maybeIndexApiResponse(url, response);
+    }).catch(() => {});
+    return responsePromise;
   };
 
   // フォールバック: XMLHttpRequestもインターセプト
@@ -309,13 +762,23 @@
 
   XMLHttpRequest.prototype.send = function (...args) {
     if (this._twblockUrl && this._twblockUrl.includes('/i/api/')) {
-      const h = this._twblockHeaders;
-      if (h && h['authorization'] && h['x-csrf-token']) {
-        capturedHeaders = {
-          authorization: h['authorization'],
-          'x-csrf-token': h['x-csrf-token'],
-        };
-      }
+      captureHeaders(this._twblockHeaders);
+
+      this.addEventListener('loadend', () => {
+        try {
+          const contentType = this.getResponseHeader('content-type') || '';
+          if (!contentType.includes('application/json')) return;
+          if (this.responseType === 'json' && this.response) {
+            indexStatusAuthors(this.response);
+            return;
+          }
+          if (this.responseType && this.responseType !== '' && this.responseType !== 'text') return;
+          if (typeof this.responseText !== 'string' || !this.responseText) return;
+          indexStatusAuthors(JSON.parse(this.responseText));
+        } catch (err) {
+          // Ignore non-JSON or inaccessible responses.
+        }
+      }, { once: true });
     }
     return origSend.apply(this, args);
   };
@@ -338,6 +801,9 @@
       return {
         authorization: 'Bearer ' + decodeURIComponent(BEARER_TOKEN),
         'x-csrf-token': csrf,
+        'x-twitter-active-user': 'yes',
+        'x-twitter-auth-type': 'OAuth2Session',
+        'x-twitter-client-language': document.documentElement.lang || 'en',
       };
     }
     return null;
@@ -436,6 +902,70 @@
     }
   }
 
+  async function resolveTweetAuthor(statusId) {
+    if (statusAuthorMap.has(statusId)) {
+      return { screenName: statusAuthorMap.get(statusId) };
+    }
+
+    const waitedScreenName = await waitForStatusAuthor(statusId, 1500);
+    if (waitedScreenName) {
+      return { screenName: waitedScreenName };
+    }
+
+    const headers = getHeaders();
+    if (!headers || !statusId) {
+      return { screenName: null };
+    }
+
+    const url =
+      'https://x.com/i/api/1.1/statuses/show.json?id=' +
+      encodeURIComponent(statusId);
+
+    try {
+      const response = await originalFetch(url, {
+        method: 'GET',
+        headers: { ...headers },
+        credentials: 'include',
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        const screenName = data.user?.screen_name || null;
+        if (screenName) {
+          rememberStatusAuthor(statusId, screenName);
+        }
+        return { screenName };
+      }
+
+      if (response.status === 403) {
+        const freshCsrf = getCsrfToken();
+        if (freshCsrf && freshCsrf !== headers['x-csrf-token']) {
+          const retryResponse = await originalFetch(url, {
+            method: 'GET',
+            headers: {
+              ...headers,
+              'x-csrf-token': freshCsrf,
+            },
+            credentials: 'include',
+          });
+          if (retryResponse.ok) {
+            capturedHeaders = { ...headers, 'x-csrf-token': freshCsrf };
+            const data = await retryResponse.json();
+            const screenName = data.user?.screen_name || null;
+            if (screenName) {
+              rememberStatusAuthor(statusId, screenName);
+            }
+            return { screenName };
+          }
+        }
+      }
+
+      return { screenName: null };
+    } catch (err) {
+      return { screenName: null };
+    }
+  }
+
   // content.jsからのメッセージを受信
   window.addEventListener('message', async (event) => {
     if (event.source !== window) return;
@@ -450,6 +980,14 @@
     if (event.data && event.data.type === '__TWBLOCK_CHECK_FOLLOWING') {
       const { screenName, requestId } = event.data;
       const result = await checkFollowing(screenName);
+      window.postMessage(
+        { type: '__TWBLOCK_RESULT', requestId, ...result },
+        '*'
+      );
+    }
+    if (event.data && event.data.type === '__TWBLOCK_RESOLVE_STATUS_AUTHOR') {
+      const { statusId, requestId } = event.data;
+      const result = await resolveTweetAuthor(statusId);
       window.postMessage(
         { type: '__TWBLOCK_RESULT', requestId, ...result },
         '*'
@@ -499,8 +1037,51 @@
     });
   }
 
+  const attributedStatusAuthors = new Map();
+  const pendingAttributedStatusAuthors = new Map();
+
+  function resolveStatusAuthorScreenName(statusId) {
+    if (attributedStatusAuthors.has(statusId)) {
+      return Promise.resolve(attributedStatusAuthors.get(statusId));
+    }
+
+    const inFlight = pendingAttributedStatusAuthors.get(statusId);
+    if (inFlight) return inFlight;
+
+    const request = new Promise((resolve) => {
+      const id = '__twb_' + ++reqId;
+      pending.set(id, (result) => {
+        const screenName = typeof result?.screenName === 'string' ? result.screenName : null;
+        if (screenName) {
+          attributedStatusAuthors.set(statusId, screenName);
+        }
+        pendingAttributedStatusAuthors.delete(statusId);
+        resolve(screenName);
+      });
+      window.postMessage(
+        { type: '__TWBLOCK_RESOLVE_STATUS_AUTHOR', statusId, requestId: id },
+        '*'
+      );
+      setTimeout(() => {
+        if (pending.has(id)) {
+          pending.delete(id);
+          pendingAttributedStatusAuthors.delete(statusId);
+          resolve(null);
+        }
+      }, 10000);
+    });
+
+    pendingAttributedStatusAuthors.set(statusId, request);
+    return request;
+  }
+
   window.addEventListener('message', (e) => {
-    if (e.source !== window || !e.data || e.data.type !== '__TWBLOCK_RESULT') return;
+    if (e.source !== window || !e.data) return;
+    if (e.data.type === '__TWBLOCK_STATUS_AUTHORS_UPDATED') {
+      setTimeout(processAttributedTweets, 0);
+      return;
+    }
+    if (e.data.type !== '__TWBLOCK_RESULT') return;
     const cb = pending.get(e.data.requestId);
     if (cb) {
       pending.delete(e.data.requestId);
@@ -803,6 +1384,125 @@
     return btn;
   }
 
+  function syncResolvedScreenName(container, screenName) {
+    if (!container || !screenName) return;
+
+    container.setAttribute('data-screen-name', screenName);
+
+    container.querySelectorAll('.twblock-btn').forEach((btn) => {
+      const action = btn.classList.contains('twblock-block') ? 'block' : 'mute';
+      const label = action === 'block' ? msg('blockLabel') : msg('muteLabel');
+      btn._screenName = screenName;
+
+      if (!btn._isActive) {
+        btn.setAttribute('aria-label', label + ' @' + screenName);
+        btn.title = label + ' @' + screenName;
+      }
+    });
+  }
+
+  function createAttributionButtons(statusId, displayName) {
+    if (!showBlock && !showMute) return null;
+
+    const container = document.createElement('div');
+    container.className = 'twblock-btn-container';
+    container.setAttribute('data-status-id', statusId);
+
+    if (showBlock) {
+      container.appendChild(createAttributionButton(statusId, 'block', msg('blockLabel'), displayName));
+    }
+    if (showMute) {
+      container.appendChild(createAttributionButton(statusId, 'mute', msg('muteLabel'), displayName));
+    }
+
+    return container;
+  }
+
+  function createAttributionButton(statusId, action, label, displayName) {
+    const btn = document.createElement('button');
+    btn.className = 'twblock-btn twblock-' + action;
+    btn.setAttribute('aria-label', displayName ? label + ' ' + displayName : label);
+    btn.title = displayName ? label + ' ' + displayName : label;
+    btn.innerHTML = getIcon(action);
+
+    btn._isActive = false;
+    btn._screenName = null;
+    const undoAction = action === 'block' ? 'unblock' : 'unmute';
+
+    btn.addEventListener('click', async (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      if (btn.disabled) return;
+
+      btn.disabled = true;
+      btn.classList.add('twblock-loading');
+
+      let screenName = btn._screenName;
+      if (!screenName) {
+        screenName = await resolveStatusAuthorScreenName(statusId);
+        if (screenName) {
+          syncResolvedScreenName(btn.closest('.twblock-btn-container'), screenName);
+        }
+      }
+
+      if (!screenName) {
+        btn.classList.remove('twblock-loading');
+        btn.classList.add('twblock-error');
+        btn.title = msg('errorOccurred');
+        btn.disabled = false;
+        setTimeout(() => btn.classList.remove('twblock-error'), 3000);
+        return;
+      }
+
+      const currentAction = btn._isActive ? undoAction : action;
+
+      if (confirmBlockFollowing && action === 'block' && !btn._isActive) {
+        const followResult = await checkFollowing(screenName);
+        if (followResult.following) {
+          btn.classList.remove('twblock-loading');
+          btn.disabled = false;
+          if (!confirm(msg('confirmBlockFollowing', screenName))) return;
+          btn.disabled = true;
+          btn.classList.add('twblock-loading');
+        }
+      }
+
+      const result = await sendAction(currentAction, screenName);
+      btn.classList.remove('twblock-loading');
+
+      if (result.success) {
+        if (!btn._isActive) {
+          btn._isActive = true;
+          btn.classList.add('twblock-success');
+          btn.innerHTML = CHECK_ICON;
+          btn.title = (action === 'block' ? msg('blockedStatus') : msg('mutedStatus')) + ' @' + screenName;
+          btn.disabled = false;
+          addBlockedUser(screenName, action);
+          showToast(msg(action === 'block' ? 'toastBlocked' : 'toastMuted', screenName));
+
+          const parentTweet = btn.closest('article[data-testid="tweet"]');
+          if (parentTweet) {
+            setTimeout(() => hideTweet(parentTweet, screenName, action), 300);
+          }
+        } else {
+          btn._isActive = false;
+          btn.classList.remove('twblock-success');
+          btn.innerHTML = getIcon(action);
+          btn.title = label + ' @' + screenName;
+          removeBlockedUser(screenName, action);
+          btn.disabled = false;
+        }
+      } else {
+        btn.classList.add('twblock-error');
+        btn.title = result.message || msg('errorOccurred');
+        btn.disabled = false;
+        setTimeout(() => btn.classList.remove('twblock-error'), 3000);
+      }
+    });
+
+    return btn;
+  }
+
   // ---- Grok/caretの行を見つけて、その中にボタンを挿入 ----
   function findGrokRow(tweet) {
     const caret = tweet.querySelector('[data-testid="caret"]');
@@ -848,6 +1548,22 @@
     return { retweeter: href.substring(1), scRow, scLinkParent };
   }
 
+  function extractAttributionInfo(tweet) {
+    const statusLink = tweet.querySelector('a[href^="/i/status/"]');
+    if (!statusLink) return null;
+
+    const href = statusLink.getAttribute('href');
+    const match = href && href.match(/^\/i\/status\/(\d+)$/);
+    if (!match) return null;
+
+    const row = statusLink.parentElement;
+    if (!row) return null;
+
+    const displayName = statusLink.textContent ? statusLink.textContent.trim() : '';
+
+    return { statusId: match[1], row, displayName };
+  }
+
   // ツイート本文エリアからscreen_nameを抽出（socialContext内のリンクを除外）
   function extractAuthorScreenName(tweet) {
     const userName = tweet.querySelector('[data-testid="User-Name"]');
@@ -856,6 +1572,57 @@
       if (result) return result;
     }
     return null;
+  }
+
+  function processAttributedTweet(tweet, me, authorName) {
+    const info = extractAttributionInfo(tweet);
+    if (!info) return;
+
+    const { statusId, row, displayName } = info;
+    if (!row.isConnected || row.getAttribute(ATTRIBUTION_PROCESSED) === '1') {
+      return;
+    }
+
+    let buttons = row.querySelector('.twblock-btn-container.twblock-attribution');
+    if (!buttons) {
+      buttons = createAttributionButtons(statusId, displayName);
+      if (!buttons) return;
+      buttons.classList.add('twblock-tweet', 'twblock-repost', 'twblock-attribution');
+      row.classList.add('twblock-repost-row', 'twblock-attribution-row');
+      row.appendChild(buttons);
+    }
+
+    row.setAttribute(ATTRIBUTION_PROCESSED, 'pending');
+
+    resolveStatusAuthorScreenName(statusId).then((attributedScreenName) => {
+      if (!row.isConnected || !buttons.isConnected) return;
+      if (!attributedScreenName) {
+        row.setAttribute(ATTRIBUTION_PROCESSED, 'pending');
+        return;
+      }
+
+      if (attributedScreenName === me || attributedScreenName === authorName) {
+        buttons.remove();
+        row.setAttribute(ATTRIBUTION_PROCESSED, '1');
+        return;
+      }
+
+      syncResolvedScreenName(buttons, attributedScreenName);
+      row.setAttribute(ATTRIBUTION_PROCESSED, '1');
+
+      const blockedAction = blockedUsers.get(attributedScreenName);
+      if (blockedAction) {
+        const activeBtn = buttons.querySelector('.twblock-' + blockedAction + ':not(.twblock-success)');
+        if (activeBtn) {
+          activeBtn._isActive = true;
+          activeBtn.classList.add('twblock-success');
+          activeBtn.innerHTML = CHECK_ICON;
+        }
+        if (!isViewingProfileTimeline(attributedScreenName)) {
+          hideTweet(tweet, attributedScreenName, blockedAction);
+        }
+      }
+    });
   }
 
   // ---- ボタン挿入: タイムラインツイート ----
@@ -943,6 +1710,16 @@
       } catch (e) {
         tweet.removeAttribute(PROCESSED);
       }
+    });
+  }
+
+  function processAttributedTweets() {
+    const me = getMyScreenName();
+    const tweets = document.querySelectorAll('article[data-testid="tweet"]');
+
+    tweets.forEach((tweet) => {
+      const authorName = extractAuthorScreenName(tweet) || extractScreenName(tweet);
+      processAttributedTweet(tweet, me, authorName);
     });
   }
 
@@ -1135,6 +1912,7 @@
   // ---- メイン処理 ----
   function processAll() {
     processTweets();
+    processAttributedTweets();
     processFollowButtons();
     processTypeahead();
   }
@@ -1165,7 +1943,7 @@
   // ---- CSS注入 ----
   function injectCSS() {
     const style = document.createElement('style');
-    style.textContent = "/* ========== Ultimate Twitter Block ========== */\r\n\r\n/* Followボタン + twblockボタンのラッパー */\r\n.twblock-follow-wrapper {\r\n  display: flex;\r\n  align-items: center;\r\n  gap: 4px;\r\n  flex-shrink: 0;\r\n}\r\n\r\n/* ラッパー内のFollowボタン親のmargin-leftをリセット */\r\n.twblock-follow-wrapper > :not(.twblock-btn-container) {\r\n  margin-left: 0 !important;\r\n}\r\n\r\n/* ボタンコンテナ（共通） */\r\n.twblock-btn-container {\r\n  display: flex;\r\n  align-items: center;\r\n  gap: 0;\r\n  flex-shrink: 0;\r\n}\r\n\r\n/* ツイートヘッダー: Grok/caret行内に配置 (Grok/caretと同サイズ) */\r\n.twblock-btn-container.twblock-tweet {\r\n  flex: 0 0 auto;\r\n  gap: 8px;\r\n}\r\n\r\n.twblock-btn-container.twblock-tweet .twblock-btn {\r\n  width: 20px;\r\n  height: 20px;\r\n  position: relative;\r\n  overflow: visible;\r\n}\r\n\r\n.twblock-btn-container.twblock-tweet .twblock-btn::before {\r\n  content: '';\r\n  position: absolute;\r\n  top: 50%;\r\n  left: 50%;\r\n  width: 34px;\r\n  height: 34px;\r\n  margin: -17px;\r\n  border-radius: 50%;\r\n  transition: background-color 0.15s ease;\r\n}\r\n\r\n.twblock-btn-container.twblock-tweet .twblock-btn svg {\r\n  width: 18.75px;\r\n  height: 18.75px;\r\n  position: relative;\r\n}\r\n\r\n/* ツイートボタン: ホバー背景は::beforeで表示、ボタン自体は透明 */\r\n.twblock-btn-container.twblock-tweet .twblock-block:hover:not(:disabled),\r\n.twblock-btn-container.twblock-tweet .twblock-mute:hover:not(:disabled) {\r\n  background-color: transparent;\r\n}\r\n\r\n.twblock-btn-container.twblock-tweet .twblock-block:hover:not(:disabled)::before {\r\n  background-color: rgba(244, 33, 46, 0.1);\r\n}\r\n\r\n.twblock-btn-container.twblock-tweet .twblock-mute:hover:not(:disabled)::before {\r\n  background-color: rgba(255, 173, 31, 0.1);\r\n}\r\n\r\n.twblock-btn-container.twblock-tweet .twblock-success:hover {\r\n  background-color: transparent !important;\r\n}\r\n\r\n.twblock-btn-container.twblock-tweet .twblock-success:hover::before {\r\n  background-color: rgba(244, 33, 46, 0.1);\r\n}\r\n\r\n/* RT(\"reposted\")行のpadding-top:12pxを上下に分散 */\r\n.twblock-repost-row .r-ttdzmv {\r\n  padding-top: 6px;\r\n  padding-bottom: 6px;\r\n}\r\n\r\n/* RT(\"reposted\")行の親をflex-rowに変更して横並びにする */\r\n.twblock-repost-row {\r\n  flex-direction: row !important;\r\n  align-items: center;\r\n  gap: 4px;\r\n}\r\n\r\n/* RT(\"reposted\")行: テキスト(16px/20px line-height)とアイコンの中心を揃える */\r\n.twblock-btn-container.twblock-repost {\r\n  gap: 4px;\r\n  margin-top: -2px;\r\n  margin-bottom: -2px;\r\n}\r\n\r\n.twblock-btn-container.twblock-repost .twblock-btn::before {\r\n  display: none;\r\n}\r\n\r\n/* プロフィール: Followボタンと同じ高さ(36px)の丸ボタン */\r\n.twblock-btn-container.twblock-profile {\r\n  gap: 8px;\r\n  align-self: flex-start;\r\n  margin-right: 8px;\r\n}\r\n\r\n.twblock-btn-container.twblock-profile .twblock-btn {\r\n  width: 36px;\r\n  height: 36px;\r\n  border-radius: 50%;\r\n  border: 1px solid light-dark(rgb(207, 217, 222), rgb(83, 100, 113));\r\n  color: light-dark(rgb(15, 20, 26), rgb(230, 233, 234));\r\n}\r\n\r\n.twblock-btn-container.twblock-profile .twblock-btn svg {\r\n  width: 20px;\r\n  height: 20px;\r\n}\r\n\r\n/* 検索候補(typeahead): Xボタンの左に配置 */\r\n.twblock-btn-container.twblock-typeahead {\r\n  gap: 4px;\r\n  flex-shrink: 0;\r\n  margin-left: auto;\r\n}\r\n\r\n.twblock-btn-container.twblock-typeahead .twblock-btn {\r\n  width: 20px;\r\n  height: 20px;\r\n}\r\n\r\n.twblock-btn-container.twblock-typeahead .twblock-btn svg {\r\n  width: 18px;\r\n  height: 18px;\r\n}\r\n\r\n/* サイドバー / フォロー一覧: 32px丸ボタン */\r\n.twblock-btn-container.twblock-sidebar {\r\n  gap: 4px;\r\n  flex-shrink: 0;\r\n}\r\n\r\n.twblock-btn-container.twblock-sidebar .twblock-btn {\r\n  width: 32px;\r\n  height: 32px;\r\n  border-radius: 50%;\r\n  border: 1px solid light-dark(rgb(207, 217, 222), rgb(83, 100, 113));\r\n  color: light-dark(rgb(15, 20, 26), rgb(230, 233, 234));\r\n}\r\n\r\n.twblock-btn-container.twblock-sidebar .twblock-btn svg {\r\n  width: 18px;\r\n  height: 18px;\r\n}\r\n\r\n/* ホバーカード */\r\n.twblock-btn-container.twblock-hovercard {\r\n  margin-right: 8px;\r\n}\r\n\r\n\r\n/* 個別ボタン（デフォルト: 34x34, アイコン20x20） */\r\n.twblock-btn {\r\n  display: inline-flex;\r\n  align-items: center;\r\n  justify-content: center;\r\n  width: 34px;\r\n  height: 34px;\r\n  border-radius: 50%;\r\n  border: none;\r\n  background: transparent;\r\n  cursor: pointer;\r\n  padding: 0;\r\n  transition: background-color 0.15s ease, color 0.15s ease;\r\n  color: light-dark(rgb(83, 100, 113), rgb(113, 118, 123));\r\n  outline: none;\r\n}\r\n\r\n.twblock-btn:focus-visible {\r\n  box-shadow: 0 0 0 2px rgb(29, 155, 240);\r\n}\r\n\r\n.twblock-btn svg {\r\n  width: 20px;\r\n  height: 20px;\r\n  fill: currentColor;\r\n  pointer-events: none;\r\n}\r\n\r\n/* ブロックボタン: ホバーで赤 */\r\n.twblock-block:hover:not(:disabled) {\r\n  background-color: rgba(244, 33, 46, 0.1);\r\n  color: rgb(244, 33, 46);\r\n}\r\n\r\n/* ミュートボタン: ホバーでオレンジ */\r\n.twblock-mute:hover:not(:disabled) {\r\n  background-color: rgba(255, 173, 31, 0.1);\r\n  color: rgb(255, 173, 31);\r\n}\r\n\r\n/* ローディング状態 */\r\n.twblock-loading {\r\n  opacity: 0.5;\r\n  pointer-events: none;\r\n}\r\n\r\n.twblock-loading svg {\r\n  animation: twblock-spin 0.8s linear infinite;\r\n}\r\n\r\n@keyframes twblock-spin {\r\n  from { transform: rotate(0deg); }\r\n  to { transform: rotate(360deg); }\r\n}\r\n\r\n/* 成功状態: 緑 (クリックで解除可能) */\r\n.twblock-success {\r\n  color: rgb(0, 186, 124) !important;\r\n}\r\n\r\n.twblock-success:hover {\r\n  background-color: rgba(244, 33, 46, 0.1) !important;\r\n  color: rgb(244, 33, 46) !important;\r\n}\r\n\r\n/* エラー状態 */\r\n.twblock-error {\r\n  color: rgb(244, 33, 46) !important;\r\n  animation: twblock-shake 0.3s ease;\r\n}\r\n\r\n@keyframes twblock-shake {\r\n  0%, 100% { transform: translateX(0); }\r\n  25% { transform: translateX(-3px); }\r\n  75% { transform: translateX(3px); }\r\n}\r\n\r\n/* ---- ブロック/ミュート後の非表示バー ---- */\r\n.twblock-hidden-bar {\r\n  display: flex;\r\n  align-items: center;\r\n  justify-content: center;\r\n  gap: 12px;\r\n  padding: 12px 16px;\r\n  border-bottom: 1px solid light-dark(rgb(239, 243, 244), rgb(47, 51, 54));\r\n  font-family: -apple-system, BlinkMacSystemFont, \"Segoe UI\", Roboto, Helvetica, Arial, sans-serif;\r\n}\r\n\r\n.twblock-hidden-label {\r\n  color: rgb(113, 118, 123);\r\n  font-size: 14px;\r\n}\r\n\r\n.twblock-show-btn {\r\n  background: none;\r\n  border: 1px solid light-dark(rgb(207, 217, 222), rgb(83, 100, 113));\r\n  border-radius: 16px;\r\n  color: light-dark(rgb(15, 20, 26), rgb(239, 243, 244));\r\n  font-size: 13px;\r\n  padding: 4px 14px;\r\n  cursor: pointer;\r\n  transition: background-color 0.15s ease;\r\n}\r\n\r\n.twblock-show-btn:hover {\r\n  background-color: light-dark(rgba(15, 20, 25, 0.1), rgba(239, 243, 244, 0.1));\r\n}\r\n\r\n/* ---- トースト通知 ---- */\r\n.twblock-toast {\r\n  position: fixed;\r\n  bottom: 40px;\r\n  left: 50%;\r\n  transform: translateX(-50%);\r\n  background: rgb(29, 155, 240);\r\n  color: rgb(255, 255, 255);\r\n  padding: 12px 24px;\r\n  border-radius: 4px;\r\n  font-size: 15px;\r\n  font-family: -apple-system, BlinkMacSystemFont, \"Segoe UI\", Roboto, sans-serif;\r\n  z-index: 10000;\r\n  animation: twblock-toast-in 0.3s ease;\r\n}\r\n\r\n.twblock-toast-hide {\r\n  opacity: 0;\r\n  transition: opacity 0.3s ease;\r\n}\r\n\r\n@keyframes twblock-toast-in {\r\n  from { opacity: 0; transform: translateX(-50%) translateY(10px); }\r\n  to { opacity: 1; transform: translateX(-50%) translateY(0); }\r\n}\r\n\r\n";
+    style.textContent = "/* ========== Ultimate Twitter Block ========== */\r\n\r\n/* Followボタン + twblockボタンのラッパー */\r\n.twblock-follow-wrapper {\r\n  display: flex;\r\n  align-items: center;\r\n  gap: 4px;\r\n  flex-shrink: 0;\r\n}\r\n\r\n/* ラッパー内のFollowボタン親のmargin-leftをリセット */\r\n.twblock-follow-wrapper > :not(.twblock-btn-container) {\r\n  margin-left: 0 !important;\r\n}\r\n\r\n/* ボタンコンテナ（共通） */\r\n.twblock-btn-container {\r\n  display: flex;\r\n  align-items: center;\r\n  gap: 0;\r\n  flex-shrink: 0;\r\n}\r\n\r\n/* ツイートヘッダー: Grok/caret行内に配置 (Grok/caretと同サイズ) */\r\n.twblock-btn-container.twblock-tweet {\r\n  flex: 0 0 auto;\r\n  gap: 8px;\r\n}\r\n\r\n.twblock-btn-container.twblock-tweet .twblock-btn {\r\n  width: 20px;\r\n  height: 20px;\r\n  position: relative;\r\n  overflow: visible;\r\n}\r\n\r\n.twblock-btn-container.twblock-tweet .twblock-btn::before {\r\n  content: '';\r\n  position: absolute;\r\n  top: 50%;\r\n  left: 50%;\r\n  width: 34px;\r\n  height: 34px;\r\n  margin: -17px;\r\n  border-radius: 50%;\r\n  transition: background-color 0.15s ease;\r\n}\r\n\r\n.twblock-btn-container.twblock-tweet .twblock-btn svg {\r\n  width: 18.75px;\r\n  height: 18.75px;\r\n  position: relative;\r\n}\r\n\r\n/* ツイートボタン: ホバー背景は::beforeで表示、ボタン自体は透明 */\r\n.twblock-btn-container.twblock-tweet .twblock-block:hover:not(:disabled),\r\n.twblock-btn-container.twblock-tweet .twblock-mute:hover:not(:disabled) {\r\n  background-color: transparent;\r\n}\r\n\r\n.twblock-btn-container.twblock-tweet .twblock-block:hover:not(:disabled)::before {\r\n  background-color: rgba(244, 33, 46, 0.1);\r\n}\r\n\r\n.twblock-btn-container.twblock-tweet .twblock-mute:hover:not(:disabled)::before {\r\n  background-color: rgba(255, 173, 31, 0.1);\r\n}\r\n\r\n.twblock-btn-container.twblock-tweet .twblock-success:hover {\r\n  background-color: transparent !important;\r\n}\r\n\r\n.twblock-btn-container.twblock-tweet .twblock-success:hover::before {\r\n  background-color: rgba(244, 33, 46, 0.1);\r\n}\r\n\r\n/* RT(\"reposted\")行のpadding-top:12pxを上下に分散 */\r\n.twblock-repost-row .r-ttdzmv {\r\n  padding-top: 6px;\r\n  padding-bottom: 6px;\r\n}\r\n\r\n/* RT(\"reposted\")行の親をflex-rowに変更して横並びにする */\r\n.twblock-repost-row {\n  flex-direction: row !important;\n  align-items: center;\n  gap: 4px;\n}\n\n.twblock-attribution-row {\n  display: flex;\n  align-items: center;\n  gap: 4px;\n  flex-wrap: wrap;\n}\n\r\n/* RT(\"reposted\")行: テキスト(16px/20px line-height)とアイコンの中心を揃える */\r\n.twblock-btn-container.twblock-repost {\r\n  gap: 4px;\r\n  margin-top: -2px;\r\n  margin-bottom: -2px;\r\n}\r\n\r\n.twblock-btn-container.twblock-repost .twblock-btn::before {\r\n  display: none;\r\n}\r\n\r\n/* プロフィール: Followボタンと同じ高さ(36px)の丸ボタン */\r\n.twblock-btn-container.twblock-profile {\r\n  gap: 8px;\r\n  align-self: flex-start;\r\n  margin-right: 8px;\r\n}\r\n\r\n.twblock-btn-container.twblock-profile .twblock-btn {\r\n  width: 36px;\r\n  height: 36px;\r\n  border-radius: 50%;\r\n  border: 1px solid light-dark(rgb(207, 217, 222), rgb(83, 100, 113));\r\n  color: light-dark(rgb(15, 20, 26), rgb(230, 233, 234));\r\n}\r\n\r\n.twblock-btn-container.twblock-profile .twblock-btn svg {\r\n  width: 20px;\r\n  height: 20px;\r\n}\r\n\r\n/* 検索候補(typeahead): Xボタンの左に配置 */\r\n.twblock-btn-container.twblock-typeahead {\r\n  gap: 4px;\r\n  flex-shrink: 0;\r\n  margin-left: auto;\r\n}\r\n\r\n.twblock-btn-container.twblock-typeahead .twblock-btn {\r\n  width: 20px;\r\n  height: 20px;\r\n}\r\n\r\n.twblock-btn-container.twblock-typeahead .twblock-btn svg {\r\n  width: 18px;\r\n  height: 18px;\r\n}\r\n\r\n/* サイドバー / フォロー一覧: 32px丸ボタン */\r\n.twblock-btn-container.twblock-sidebar {\r\n  gap: 4px;\r\n  flex-shrink: 0;\r\n}\r\n\r\n.twblock-btn-container.twblock-sidebar .twblock-btn {\r\n  width: 32px;\r\n  height: 32px;\r\n  border-radius: 50%;\r\n  border: 1px solid light-dark(rgb(207, 217, 222), rgb(83, 100, 113));\r\n  color: light-dark(rgb(15, 20, 26), rgb(230, 233, 234));\r\n}\r\n\r\n.twblock-btn-container.twblock-sidebar .twblock-btn svg {\r\n  width: 18px;\r\n  height: 18px;\r\n}\r\n\r\n/* ホバーカード */\r\n.twblock-btn-container.twblock-hovercard {\r\n  margin-right: 8px;\r\n}\r\n\r\n\r\n/* 個別ボタン（デフォルト: 34x34, アイコン20x20） */\r\n.twblock-btn {\r\n  display: inline-flex;\r\n  align-items: center;\r\n  justify-content: center;\r\n  width: 34px;\r\n  height: 34px;\r\n  border-radius: 50%;\r\n  border: none;\r\n  background: transparent;\r\n  cursor: pointer;\r\n  padding: 0;\r\n  transition: background-color 0.15s ease, color 0.15s ease;\r\n  color: light-dark(rgb(83, 100, 113), rgb(113, 118, 123));\r\n  outline: none;\r\n}\r\n\r\n.twblock-btn:focus-visible {\r\n  box-shadow: 0 0 0 2px rgb(29, 155, 240);\r\n}\r\n\r\n.twblock-btn svg {\r\n  width: 20px;\r\n  height: 20px;\r\n  fill: currentColor;\r\n  pointer-events: none;\r\n}\r\n\r\n/* ブロックボタン: ホバーで赤 */\r\n.twblock-block:hover:not(:disabled) {\r\n  background-color: rgba(244, 33, 46, 0.1);\r\n  color: rgb(244, 33, 46);\r\n}\r\n\r\n/* ミュートボタン: ホバーでオレンジ */\r\n.twblock-mute:hover:not(:disabled) {\r\n  background-color: rgba(255, 173, 31, 0.1);\r\n  color: rgb(255, 173, 31);\r\n}\r\n\r\n/* ローディング状態 */\r\n.twblock-loading {\r\n  opacity: 0.5;\r\n  pointer-events: none;\r\n}\r\n\r\n.twblock-loading svg {\r\n  animation: twblock-spin 0.8s linear infinite;\r\n}\r\n\r\n@keyframes twblock-spin {\r\n  from { transform: rotate(0deg); }\r\n  to { transform: rotate(360deg); }\r\n}\r\n\r\n/* 成功状態: 緑 (クリックで解除可能) */\r\n.twblock-success {\r\n  color: rgb(0, 186, 124) !important;\r\n}\r\n\r\n.twblock-success:hover {\r\n  background-color: rgba(244, 33, 46, 0.1) !important;\r\n  color: rgb(244, 33, 46) !important;\r\n}\r\n\r\n/* エラー状態 */\r\n.twblock-error {\r\n  color: rgb(244, 33, 46) !important;\r\n  animation: twblock-shake 0.3s ease;\r\n}\r\n\r\n@keyframes twblock-shake {\r\n  0%, 100% { transform: translateX(0); }\r\n  25% { transform: translateX(-3px); }\r\n  75% { transform: translateX(3px); }\r\n}\r\n\r\n/* ---- ブロック/ミュート後の非表示バー ---- */\r\n.twblock-hidden-bar {\r\n  display: flex;\r\n  align-items: center;\r\n  justify-content: center;\r\n  gap: 12px;\r\n  padding: 12px 16px;\r\n  border-bottom: 1px solid light-dark(rgb(239, 243, 244), rgb(47, 51, 54));\r\n  font-family: -apple-system, BlinkMacSystemFont, \"Segoe UI\", Roboto, Helvetica, Arial, sans-serif;\r\n}\r\n\r\n.twblock-hidden-label {\r\n  color: rgb(113, 118, 123);\r\n  font-size: 14px;\r\n}\r\n\r\n.twblock-show-btn {\r\n  background: none;\r\n  border: 1px solid light-dark(rgb(207, 217, 222), rgb(83, 100, 113));\r\n  border-radius: 16px;\r\n  color: light-dark(rgb(15, 20, 26), rgb(239, 243, 244));\r\n  font-size: 13px;\r\n  padding: 4px 14px;\r\n  cursor: pointer;\r\n  transition: background-color 0.15s ease;\r\n}\r\n\r\n.twblock-show-btn:hover {\r\n  background-color: light-dark(rgba(15, 20, 25, 0.1), rgba(239, 243, 244, 0.1));\r\n}\r\n\r\n/* ---- トースト通知 ---- */\r\n.twblock-toast {\r\n  position: fixed;\r\n  bottom: 40px;\r\n  left: 50%;\r\n  transform: translateX(-50%);\r\n  background: rgb(29, 155, 240);\r\n  color: rgb(255, 255, 255);\r\n  padding: 12px 24px;\r\n  border-radius: 4px;\r\n  font-size: 15px;\r\n  font-family: -apple-system, BlinkMacSystemFont, \"Segoe UI\", Roboto, sans-serif;\r\n  z-index: 10000;\r\n  animation: twblock-toast-in 0.3s ease;\r\n}\r\n\r\n.twblock-toast-hide {\r\n  opacity: 0;\r\n  transition: opacity 0.3s ease;\r\n}\r\n\r\n@keyframes twblock-toast-in {\r\n  from { opacity: 0; transform: translateX(-50%) translateY(10px); }\r\n  to { opacity: 1; transform: translateX(-50%) translateY(0); }\r\n}\r\n\r\n";
     document.head.appendChild(style);
   }
 
@@ -1174,6 +1952,8 @@
   async function init() {
     injectCSS();
     cacheI18n();
+    loadIconDebugFlag();
+    installIconDebugHooks();
     injectPageScript();
     await loadStoredIcons();
     await loadSettings();

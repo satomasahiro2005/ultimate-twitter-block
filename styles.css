@@ -87,6 +87,13 @@
   gap: 4px;
 }
 
+.twblock-attribution-row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-wrap: wrap;
+}
+
 /* RT("reposted")行: テキスト(16px/20px line-height)とアイコンの中心を揃える */
 .twblock-btn-container.twblock-repost {
   gap: 4px;
