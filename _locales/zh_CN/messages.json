@@ -46,6 +46,8 @@
   },
 
   "sectionStats": { "message": "统计" },
+  "statsBlockedLabel": { "message": "屏蔽" },
+  "statsMutedLabel": { "message": "隐藏" },
   "resetStats": { "message": "重置统计" },
 
   "sectionReset": { "message": "重置" },
@@ -55,4 +57,3 @@
 
   "supportLabel": { "message": "支持" }
 }
-

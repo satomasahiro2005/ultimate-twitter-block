@@ -1,3 +1,18 @@
+:root {
+  color-scheme: light dark;
+  --bg: light-dark(#f3f6f8, #121922);
+  --panel: light-dark(rgba(255, 255, 255, 0.92), rgba(28, 39, 52, 0.94));
+  --panel-border: light-dark(rgba(15, 23, 42, 0.08), rgba(148, 163, 184, 0.18));
+  --panel-border-strong: light-dark(rgba(29, 155, 240, 0.22), rgba(103, 184, 255, 0.28));
+  --text: light-dark(#0f1419, #e7e9ea);
+  --muted: light-dark(#5f6f7e, #8b98a5);
+  --accent: rgb(29, 155, 240);
+  --accent-soft: light-dark(rgba(29, 155, 240, 0.1), rgba(29, 155, 240, 0.18));
+  --danger: rgb(244, 33, 46);
+  --danger-soft: light-dark(rgba(244, 33, 46, 0.08), rgba(244, 33, 46, 0.16));
+  --shadow: light-dark(0 18px 40px rgba(15, 23, 42, 0.08), 0 10px 28px rgba(0, 0, 0, 0.28));
+}
+
 * {
   margin: 0;
   padding: 0;
@@ -6,57 +21,77 @@
 
 body {
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-  color-scheme: light dark;
-  background: light-dark(#f7f9fa, #15202b);
-  color: light-dark(#0f1419, #e7e9ea);
-  padding: 32px;
+  background:
+    radial-gradient(circle at top left, light-dark(rgba(29, 155, 240, 0.09), rgba(29, 155, 240, 0.1)), transparent 34%),
+    linear-gradient(180deg, light-dark(#f7f9fb, #15202b), var(--bg));
+  color: var(--text);
+  min-height: 100vh;
+  padding: 32px 20px 40px;
 }
 
 .options-container {
-  max-width: 480px;
+  max-width: 520px;
   margin: 0 auto;
 }
 
 h1 {
-  font-size: 22px;
+  font-size: 24px;
   font-weight: 700;
-  margin-bottom: 24px;
+  letter-spacing: -0.02em;
+  margin-bottom: 20px;
 }
 
 h1 .subtitle {
   font-size: 14px;
   font-weight: 400;
-  color: rgb(113, 118, 123);
+  color: var(--muted);
   margin-left: 8px;
 }
 
 .section {
-  background: light-dark(#ffffff, #1e2d3d);
-  border-radius: 12px;
+  background: var(--panel);
+  border: 1px solid var(--panel-border);
+  border-radius: 16px;
   padding: 20px;
-  margin-bottom: 16px;
+  margin-bottom: 14px;
+  box-shadow: var(--shadow);
+  backdrop-filter: blur(10px);
 }
 
 .section h2 {
   font-size: 15px;
   font-weight: 700;
-  margin-bottom: 12px;
+  letter-spacing: 0.01em;
+  margin-bottom: 14px;
 }
 
 .checkbox-row {
   display: flex;
   align-items: center;
-  gap: 10px;
-  padding: 8px 0;
+  gap: 12px;
+  padding: 10px 0;
   cursor: pointer;
   font-size: 14px;
+  line-height: 1.45;
+  border-radius: 10px;
+  transition: background-color 0.15s ease;
+}
+
+.checkbox-row:hover {
+  background: var(--accent-soft);
 }
 
 .checkbox-row input[type="checkbox"] {
   width: 18px;
   height: 18px;
-  accent-color: rgb(29, 155, 240);
+  accent-color: var(--accent);
   cursor: pointer;
+  flex: 0 0 auto;
+}
+
+.checkbox-row input[type="checkbox"]:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
 }
 
 .icon-preview-row {
@@ -74,7 +109,7 @@ h1 .subtitle {
 
 .icon-label {
   font-size: 12px;
-  color: rgb(113, 118, 123);
+  color: var(--muted);
 }
 
 .icon-preview {
@@ -84,8 +119,8 @@ h1 .subtitle {
   align-items: center;
   justify-content: center;
   border-radius: 50%;
-  border: 1px solid light-dark(rgb(207, 217, 222), rgb(83, 100, 113));
-  color: light-dark(rgb(15, 20, 26), rgb(230, 233, 234));
+  border: 1px solid var(--panel-border);
+  color: var(--text);
 }
 
 .icon-preview svg {
@@ -96,60 +131,79 @@ h1 .subtitle {
 
 .btn {
   display: inline-block;
+  min-height: 38px;
   padding: 8px 18px;
   font-size: 13px;
   font-weight: 600;
-  border-radius: 20px;
-  border: 1px solid light-dark(rgb(207, 217, 222), rgb(83, 100, 113));
-  background: transparent;
-  color: light-dark(#0f1419, #e7e9ea);
+  border-radius: 999px;
+  border: 1px solid var(--panel-border);
+  background: light-dark(rgba(255, 255, 255, 0.7), rgba(255, 255, 255, 0.02));
+  color: var(--text);
   cursor: pointer;
-  transition: background-color 0.15s ease;
+  transition: background-color 0.15s ease, border-color 0.15s ease, transform 0.15s ease;
 }
 
 .btn:hover {
-  background: light-dark(rgba(15, 20, 25, 0.1), rgba(239, 243, 244, 0.1));
+  background: var(--accent-soft);
+  border-color: var(--panel-border-strong);
+}
+
+.btn:active {
+  transform: translateY(1px);
+}
+
+.btn:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
 }
 
 .btn-danger {
-  color: rgb(244, 33, 46);
-  border-color: rgba(244, 33, 46, 0.4);
+  color: var(--danger);
+  border-color: color-mix(in srgb, var(--danger) 34%, var(--panel-border));
 }
 
 .btn-danger:hover {
-  background: rgba(244, 33, 46, 0.1);
+  background: var(--danger-soft);
+  border-color: color-mix(in srgb, var(--danger) 55%, var(--panel-border));
 }
 
 .hint {
   font-size: 12px;
-  color: rgb(113, 118, 123);
+  color: var(--muted);
+  line-height: 1.5;
   margin-top: 8px;
 }
 
 .stats-row {
-  display: flex;
-  gap: 32px;
-  margin-bottom: 12px;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  margin-bottom: 14px;
 }
 
 .stat-item {
   display: flex;
   flex-direction: column;
-  align-items: center;
-  gap: 2px;
+  gap: 6px;
+  padding: 14px 16px;
+  border-radius: 12px;
+  border: 1px solid var(--panel-border);
+  background: light-dark(rgba(247, 249, 250, 0.9), rgba(255, 255, 255, 0.02));
 }
 
 .stat-count {
-  font-size: 28px;
+  font-size: 30px;
   font-weight: 700;
-  color: rgb(29, 155, 240);
+  color: var(--accent);
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
 }
 
 .stat-label {
   font-size: 11px;
-  color: rgb(113, 118, 123);
+  color: var(--muted);
   text-transform: uppercase;
-  letter-spacing: 0.5px;
+  letter-spacing: 0.08em;
 }
 
 .support-links {
@@ -167,16 +221,41 @@ h1 .subtitle {
 .support-icon {
   width: 20px;
   text-align: center;
-  color: rgb(113, 118, 123);
+  color: var(--muted);
   font-size: 14px;
 }
 
 .support-links a {
-  color: rgb(29, 155, 240);
+  color: var(--accent);
   text-decoration: none;
   font-size: 14px;
+  font-weight: 600;
 }
 
 .support-links a:hover {
   text-decoration: underline;
+}
+
+@media (max-width: 560px) {
+  body {
+    padding: 22px 14px 30px;
+  }
+
+  .section {
+    padding: 18px 16px;
+  }
+
+  h1 {
+    font-size: 22px;
+    line-height: 1.25;
+  }
+
+  h1 .subtitle {
+    display: inline-block;
+    margin-left: 6px;
+  }
+
+  .stats-row {
+    grid-template-columns: 1fr;
+  }
 }

@@ -46,6 +46,8 @@
   },
 
   "sectionStats": { "message": "統計" },
+  "statsBlockedLabel": { "message": "ブロック" },
+  "statsMutedLabel": { "message": "ミュート" },
   "resetStats": { "message": "統計をリセット" },
 
   "sectionReset": { "message": "リセット" },

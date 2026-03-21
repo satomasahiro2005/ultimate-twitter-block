@@ -46,6 +46,8 @@
   },
 
   "sectionStats": { "message": "Statistics" },
+  "statsBlockedLabel": { "message": "Blocked" },
+  "statsMutedLabel": { "message": "Muted" },
   "resetStats": { "message": "Reset Statistics" },
 
   "sectionReset": { "message": "Reset" },
