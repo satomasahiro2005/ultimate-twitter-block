@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Ultimate Twitter Block
 // @namespace    twitter-block-userscript
-// @version      2.2.0
+// @version      2.2.1
 // @description  Add one-click block/mute buttons to tweets, profiles, and search suggestions on Twitter/X
 // @author       nemut.ai
 // @match        https://x.com/*
@@ -18,7 +18,6 @@
   window.__twblockInjected = true;
 
   const PROCESSED = 'data-twblock';
-  const ATTRIBUTION_PROCESSED = 'data-twblock-attribution';
   const RESERVED_PATHS = new Set([
     'home', 'explore', 'search', 'notifications', 'messages',
     'settings', 'i', 'compose', 'login', 'logout', 'signup',
@@ -347,7 +346,7 @@
   // ---- i18n ----
   const _lang = (navigator.language || '').toLowerCase();
   const _L = _lang.startsWith('ja') ? 'ja' : (_lang.startsWith('zh') ? 'zh_CN' : 'en');
-  const _M = {"en":{"extName":"Ultimate Twitter Block","extDescription":"Add one-click block & mute buttons to every tweet, retweet, quote tweet, and profile on Twitter/X. Native UI design.","blockLabel":"Block","muteLabel":"Mute","blockedStatus":"Blocked","mutedStatus":"Muted","unblockLabel":"Unblock","unmuteLabel":"Unmute","toastBlocked":"Blocked @$1","toastMuted":"Muted @$1","toastUnblocked":"Unblocked @$1","toastUnmuted":"Unmuted @$1","errorTimeout":"Timed out","errorOccurred":"An error occurred","popupDescription":"One-click block & mute from tweets and profiles","settingsLabel":"Settings","sectionButtons":"Button Display","showBlockButton":"Show block button","showMuteButton":"Show mute button","confirmBlockFollowingLabel":"Confirm before blocking followed users","confirmBlockFollowing":"You are following @$1. Block anyway?","sectionStats":"Statistics","resetStats":"Reset Statistics","sectionReset":"Reset","resetHint":"Reset all data (statistics, icons, settings) to defaults","fullReset":"Full Reset Extension","confirmReset":"Reset all data (statistics and settings)?","supportLabel":"Support"},"ja":{"extName":"Ultimate Twitter Block","extDescription":"Twitter/Xのタイムラインにワンクリックのブロック＆ミュートボタンを追加。ツイート・RT・引用RT・プロフィールに対応。","blockLabel":"ブロック","muteLabel":"ミュート","blockedStatus":"ブロック済み","mutedStatus":"ミュート済み","unblockLabel":"ブロック解除","unmuteLabel":"ミュート解除","toastBlocked":"@$1 をブロックしました","toastMuted":"@$1 をミュートしました","toastUnblocked":"@$1 のブロックを解除しました","toastUnmuted":"@$1 のミュートを解除しました","errorTimeout":"タイムアウトしました","errorOccurred":"エラーが発生しました","popupDescription":"ツイートやプロフィールに表示されるボタンでワンクリックブロック＆ミュート","settingsLabel":"設定","sectionButtons":"ボタン表示","showBlockButton":"ブロックボタンを表示","showMuteButton":"ミュートボタンを表示","confirmBlockFollowingLabel":"フォロー中のユーザーをブロックする前に確認する","confirmBlockFollowing":"@$1 はフォロー中です。ブロックしますか？","sectionStats":"統計","resetStats":"統計をリセット","sectionReset":"リセット","resetHint":"統計・アイコン・設定をすべて初期状態に戻します","fullReset":"拡張機能を完全リセット","confirmReset":"すべてのデータ（統計・設定）をリセットしますか？","supportLabel":"サポート"},"zh_CN":{"extName":"Ultimate Twitter Block","extDescription":"在 Twitter/X 上为每条推文、转发、引用推文和个人资料添加一键屏蔽与隐藏按钮。原生界面风格。","blockLabel":"屏蔽","muteLabel":"隐藏","blockedStatus":"已屏蔽","mutedStatus":"已隐藏","unblockLabel":"取消屏蔽","unmuteLabel":"取消隐藏","toastBlocked":"已屏蔽 @$1","toastMuted":"已隐藏 @$1","toastUnblocked":"已对 @$1 取消屏蔽","toastUnmuted":"已对 @$1 取消隐藏","errorTimeout":"请求超时","errorOccurred":"发生错误","popupDescription":"在推文和个人资料中一键屏蔽与隐藏","settingsLabel":"设置","sectionButtons":"按钮显示","showBlockButton":"显示屏蔽按钮","showMuteButton":"显示隐藏按钮","confirmBlockFollowingLabel":"屏蔽已关注用户前先确认","confirmBlockFollowing":"你已关注 @$1。仍要屏蔽吗？","sectionStats":"统计","resetStats":"重置统计","sectionReset":"重置","resetHint":"将统计、图标和设置恢复为默认值","fullReset":"完全重置扩展","confirmReset":"要重置所有数据（统计和设置）吗？","supportLabel":"支持"}};
+  const _M = {"en":{"extName":"Ultimate Twitter Block","extDescription":"Add one-click block & mute buttons to every tweet, retweet, quote tweet, and profile on Twitter/X. Native UI design.","blockLabel":"Block","muteLabel":"Mute","blockedStatus":"Blocked","mutedStatus":"Muted","unblockLabel":"Unblock","unmuteLabel":"Unmute","toastBlocked":"Blocked @$1","toastMuted":"Muted @$1","toastUnblocked":"Unblocked @$1","toastUnmuted":"Unmuted @$1","errorTimeout":"Timed out","errorOccurred":"An error occurred","popupDescription":"One-click block & mute from tweets and profiles","settingsLabel":"Settings","sectionButtons":"Button Display","showBlockButton":"Show block button","showMuteButton":"Show mute button","confirmBlockFollowingLabel":"Confirm before blocking followed users","confirmBlockFollowing":"You are following @$1. Block anyway?","sectionStats":"Statistics","statsBlockedLabel":"Blocked","statsMutedLabel":"Muted","resetStats":"Reset Statistics","sectionReset":"Reset","resetHint":"Reset all data (statistics, icons, settings) to defaults","fullReset":"Full Reset Extension","confirmReset":"Reset all data (statistics and settings)?","supportLabel":"Support"},"ja":{"extName":"Ultimate Twitter Block","extDescription":"Twitter/Xのタイムラインにワンクリックのブロック＆ミュートボタンを追加。ツイート・RT・引用RT・プロフィールに対応。","blockLabel":"ブロック","muteLabel":"ミュート","blockedStatus":"ブロック済み","mutedStatus":"ミュート済み","unblockLabel":"ブロック解除","unmuteLabel":"ミュート解除","toastBlocked":"@$1 をブロックしました","toastMuted":"@$1 をミュートしました","toastUnblocked":"@$1 のブロックを解除しました","toastUnmuted":"@$1 のミュートを解除しました","errorTimeout":"タイムアウトしました","errorOccurred":"エラーが発生しました","popupDescription":"ツイートやプロフィールに表示されるボタンでワンクリックブロック＆ミュート","settingsLabel":"設定","sectionButtons":"ボタン表示","showBlockButton":"ブロックボタンを表示","showMuteButton":"ミュートボタンを表示","confirmBlockFollowingLabel":"フォロー中のユーザーをブロックする前に確認する","confirmBlockFollowing":"@$1 はフォロー中です。ブロックしますか？","sectionStats":"統計","statsBlockedLabel":"ブロック","statsMutedLabel":"ミュート","resetStats":"統計をリセット","sectionReset":"リセット","resetHint":"統計・アイコン・設定をすべて初期状態に戻します","fullReset":"拡張機能を完全リセット","confirmReset":"すべてのデータ（統計・設定）をリセットしますか？","supportLabel":"サポート"},"zh_CN":{"extName":"Ultimate Twitter Block","extDescription":"在 Twitter/X 上为每条推文、转发、引用推文和个人资料添加一键屏蔽与隐藏按钮。原生界面风格。","blockLabel":"屏蔽","muteLabel":"隐藏","blockedStatus":"已屏蔽","mutedStatus":"已隐藏","unblockLabel":"取消屏蔽","unmuteLabel":"取消隐藏","toastBlocked":"已屏蔽 @$1","toastMuted":"已隐藏 @$1","toastUnblocked":"已对 @$1 取消屏蔽","toastUnmuted":"已对 @$1 取消隐藏","errorTimeout":"请求超时","errorOccurred":"发生错误","popupDescription":"在推文和个人资料中一键屏蔽与隐藏","settingsLabel":"设置","sectionButtons":"按钮显示","showBlockButton":"显示屏蔽按钮","showMuteButton":"显示隐藏按钮","confirmBlockFollowingLabel":"屏蔽已关注用户前先确认","confirmBlockFollowing":"你已关注 @$1。仍要屏蔽吗？","sectionStats":"统计","statsBlockedLabel":"屏蔽","statsMutedLabel":"隐藏","resetStats":"重置统计","sectionReset":"重置","resetHint":"将统计、图标和设置恢复为默认值","fullReset":"完全重置扩展","confirmReset":"要重置所有数据（统计和设置）吗？","supportLabel":"支持"}};
   function _i18n(key) { return (_M[_L] || _M.en)[key] || key; }
   const i18n = {};
   function cacheI18n() {
@@ -570,105 +569,6 @@
   'use strict';
 
   let capturedHeaders = null;
-  const statusAuthorMap = new Map();
-  const pendingStatusAuthorWaiters = new Map();
-  let statusAuthorUpdateScheduled = false;
-
-  function scheduleStatusAuthorUpdate() {
-    if (statusAuthorUpdateScheduled) return;
-    statusAuthorUpdateScheduled = true;
-    setTimeout(() => {
-      statusAuthorUpdateScheduled = false;
-      window.postMessage({ type: '__TWBLOCK_STATUS_AUTHORS_UPDATED' }, '*');
-    }, 0);
-  }
-
-  function notifyStatusAuthorResolved(statusId, screenName) {
-    const waiters = pendingStatusAuthorWaiters.get(statusId);
-    if (!waiters) return;
-    pendingStatusAuthorWaiters.delete(statusId);
-    for (const resolve of waiters) resolve(screenName);
-  }
-
-  function rememberStatusAuthor(statusId, screenName) {
-    if (!/^\d+$/.test(statusId) || !/^[A-Za-z0-9_]{1,15}$/.test(screenName)) {
-      return false;
-    }
-    if (statusAuthorMap.get(statusId) === screenName) {
-      return false;
-    }
-    statusAuthorMap.set(statusId, screenName);
-    notifyStatusAuthorResolved(statusId, screenName);
-    scheduleStatusAuthorUpdate();
-    return true;
-  }
-
-  function extractTweetScreenName(node) {
-    return (
-      node?.user?.screen_name ||
-      node?.core?.user_results?.result?.legacy?.screen_name ||
-      node?.core?.user_results?.result?.screen_name ||
-      null
-    );
-  }
-
-  function extractTweetIds(node) {
-    const ids = [
-      node?.rest_id,
-      node?.legacy?.id_str,
-      node?.id_str,
-    ];
-    return ids.filter((id, index) => typeof id === 'string' && /^\d+$/.test(id) && ids.indexOf(id) === index);
-  }
-
-  function isTweetLikeNode(node) {
-    return Boolean(
-      node &&
-      typeof node === 'object' &&
-      (
-        node.__typename === 'Tweet' ||
-        node.__typename === 'TweetWithVisibilityResults' ||
-        node.user ||
-        node.core?.user_results ||
-        node.legacy?.conversation_id_str ||
-        node.legacy?.user_id_str ||
-        node.legacy?.full_text
-      )
-    );
-  }
-
-  function indexStatusAuthors(payload) {
-    if (!payload || typeof payload !== 'object') return;
-
-    const stack = [payload];
-    const seen = new Set();
-
-    while (stack.length) {
-      const node = stack.pop();
-      if (!node || typeof node !== 'object' || seen.has(node)) continue;
-      seen.add(node);
-
-      if (isTweetLikeNode(node)) {
-        const screenName = extractTweetScreenName(node);
-        if (screenName) {
-          for (const statusId of extractTweetIds(node)) {
-            rememberStatusAuthor(statusId, screenName);
-          }
-        }
-      }
-
-      if (Array.isArray(node)) {
-        for (const value of node) {
-          if (value && typeof value === 'object') stack.push(value);
-        }
-        continue;
-      }
-
-      for (const value of Object.values(node)) {
-        if (value && typeof value === 'object') stack.push(value);
-      }
-    }
-  }
 
   function captureHeaders(headers) {
     if (!headers) return;
@@ -686,42 +586,6 @@
     };
   }
 
-  function maybeIndexApiResponse(url, response) {
-    if (typeof url !== 'string' || !url.includes('/i/api/') || !response?.ok) {
-      return;
-    }
-
-    const contentType = response.headers?.get('content-type') || '';
-    if (!contentType.includes('application/json')) return;
-
-    response.clone().json()
-      .then((data) => { indexStatusAuthors(data); })
-      .catch(() => {});
-  }
-
-  function waitForStatusAuthor(statusId, timeoutMs) {
-    if (statusAuthorMap.has(statusId)) {
-      return Promise.resolve(statusAuthorMap.get(statusId));
-    }
-
-    return new Promise((resolve) => {
-      const waiters = pendingStatusAuthorWaiters.get(statusId) || [];
-      waiters.push(resolve);
-      pendingStatusAuthorWaiters.set(statusId, waiters);
-
-      setTimeout(() => {
-        const current = pendingStatusAuthorWaiters.get(statusId);
-        if (!current) return;
-        const index = current.indexOf(resolve);
-        if (index >= 0) current.splice(index, 1);
-        if (current.length === 0) {
-          pendingStatusAuthorWaiters.delete(statusId);
-        }
-        resolve(null);
-      }, timeoutMs);
-    });
-  }
-
   // Twitterのfetchをインターセプトして認証ヘッダーを取得
   const originalFetch = window.fetch;
   window.fetch = function (...args) {
@@ -735,11 +599,7 @@
         captureHeaders(headers);
       }
     }
-    const responsePromise = originalFetch.apply(this, args);
-    responsePromise.then((response) => {
-      maybeIndexApiResponse(url, response);
-    }).catch(() => {});
-    return responsePromise;
+    return originalFetch.apply(this, args);
   };
 
   // フォールバック: XMLHttpRequestもインターセプト
@@ -763,22 +623,6 @@
   XMLHttpRequest.prototype.send = function (...args) {
     if (this._twblockUrl && this._twblockUrl.includes('/i/api/')) {
       captureHeaders(this._twblockHeaders);
-
-      this.addEventListener('loadend', () => {
-        try {
-          const contentType = this.getResponseHeader('content-type') || '';
-          if (!contentType.includes('application/json')) return;
-          if (this.responseType === 'json' && this.response) {
-            indexStatusAuthors(this.response);
-            return;
-          }
-          if (this.responseType && this.responseType !== '' && this.responseType !== 'text') return;
-          if (typeof this.responseText !== 'string' || !this.responseText) return;
-          indexStatusAuthors(JSON.parse(this.responseText));
-        } catch (err) {
-          // Ignore non-JSON or inaccessible responses.
-        }
-      }, { once: true });
     }
     return origSend.apply(this, args);
   };
@@ -902,70 +746,6 @@
     }
   }
 
-  async function resolveTweetAuthor(statusId) {
-    if (statusAuthorMap.has(statusId)) {
-      return { screenName: statusAuthorMap.get(statusId) };
-    }
-
-    const waitedScreenName = await waitForStatusAuthor(statusId, 1500);
-    if (waitedScreenName) {
-      return { screenName: waitedScreenName };
-    }
-
-    const headers = getHeaders();
-    if (!headers || !statusId) {
-      return { screenName: null };
-    }
-
-    const url =
-      'https://x.com/i/api/1.1/statuses/show.json?id=' +
-      encodeURIComponent(statusId);
-
-    try {
-      const response = await originalFetch(url, {
-        method: 'GET',
-        headers: { ...headers },
-        credentials: 'include',
-      });
-
-      if (response.ok) {
-        const data = await response.json();
-        const screenName = data.user?.screen_name || null;
-        if (screenName) {
-          rememberStatusAuthor(statusId, screenName);
-        }
-        return { screenName };
-      }
-
-      if (response.status === 403) {
-        const freshCsrf = getCsrfToken();
-        if (freshCsrf && freshCsrf !== headers['x-csrf-token']) {
-          const retryResponse = await originalFetch(url, {
-            method: 'GET',
-            headers: {
-              ...headers,
-              'x-csrf-token': freshCsrf,
-            },
-            credentials: 'include',
-          });
-          if (retryResponse.ok) {
-            capturedHeaders = { ...headers, 'x-csrf-token': freshCsrf };
-            const data = await retryResponse.json();
-            const screenName = data.user?.screen_name || null;
-            if (screenName) {
-              rememberStatusAuthor(statusId, screenName);
-            }
-            return { screenName };
-          }
-        }
-      }
-
-      return { screenName: null };
-    } catch (err) {
-      return { screenName: null };
-    }
-  }
-
   // content.jsからのメッセージを受信
   window.addEventListener('message', async (event) => {
     if (event.source !== window) return;
@@ -980,14 +760,6 @@
     if (event.data && event.data.type === '__TWBLOCK_CHECK_FOLLOWING') {
       const { screenName, requestId } = event.data;
       const result = await checkFollowing(screenName);
-      window.postMessage(
-        { type: '__TWBLOCK_RESULT', requestId, ...result },
-        '*'
-      );
-    }
-    if (event.data && event.data.type === '__TWBLOCK_RESOLVE_STATUS_AUTHOR') {
-      const { statusId, requestId } = event.data;
-      const result = await resolveTweetAuthor(statusId);
       window.postMessage(
         { type: '__TWBLOCK_RESULT', requestId, ...result },
         '*'
@@ -1037,50 +809,8 @@
     });
   }
 
-  const attributedStatusAuthors = new Map();
-  const pendingAttributedStatusAuthors = new Map();
-
-  function resolveStatusAuthorScreenName(statusId) {
-    if (attributedStatusAuthors.has(statusId)) {
-      return Promise.resolve(attributedStatusAuthors.get(statusId));
-    }
-
-    const inFlight = pendingAttributedStatusAuthors.get(statusId);
-    if (inFlight) return inFlight;
-
-    const request = new Promise((resolve) => {
-      const id = '__twb_' + ++reqId;
-      pending.set(id, (result) => {
-        const screenName = typeof result?.screenName === 'string' ? result.screenName : null;
-        if (screenName) {
-          attributedStatusAuthors.set(statusId, screenName);
-        }
-        pendingAttributedStatusAuthors.delete(statusId);
-        resolve(screenName);
-      });
-      window.postMessage(
-        { type: '__TWBLOCK_RESOLVE_STATUS_AUTHOR', statusId, requestId: id },
-        '*'
-      );
-      setTimeout(() => {
-        if (pending.has(id)) {
-          pending.delete(id);
-          pendingAttributedStatusAuthors.delete(statusId);
-          resolve(null);
-        }
-      }, 10000);
-    });
-
-    pendingAttributedStatusAuthors.set(statusId, request);
-    return request;
-  }
-
   window.addEventListener('message', (e) => {
     if (e.source !== window || !e.data) return;
-    if (e.data.type === '__TWBLOCK_STATUS_AUTHORS_UPDATED') {
-      setTimeout(processAttributedTweets, 0);
-      return;
-    }
     if (e.data.type !== '__TWBLOCK_RESULT') return;
     const cb = pending.get(e.data.requestId);
     if (cb) {
@@ -1384,125 +1114,6 @@
     return btn;
   }
 
-  function syncResolvedScreenName(container, screenName) {
-    if (!container || !screenName) return;
-
-    container.setAttribute('data-screen-name', screenName);
-
-    container.querySelectorAll('.twblock-btn').forEach((btn) => {
-      const action = btn.classList.contains('twblock-block') ? 'block' : 'mute';
-      const label = action === 'block' ? msg('blockLabel') : msg('muteLabel');
-      btn._screenName = screenName;
-
-      if (!btn._isActive) {
-        btn.setAttribute('aria-label', label + ' @' + screenName);
-        btn.title = label + ' @' + screenName;
-      }
-    });
-  }
-
-  function createAttributionButtons(statusId, displayName) {
-    if (!showBlock && !showMute) return null;
-
-    const container = document.createElement('div');
-    container.className = 'twblock-btn-container';
-    container.setAttribute('data-status-id', statusId);
-
-    if (showBlock) {
-      container.appendChild(createAttributionButton(statusId, 'block', msg('blockLabel'), displayName));
-    }
-    if (showMute) {
-      container.appendChild(createAttributionButton(statusId, 'mute', msg('muteLabel'), displayName));
-    }
-
-    return container;
-  }
-
-  function createAttributionButton(statusId, action, label, displayName) {
-    const btn = document.createElement('button');
-    btn.className = 'twblock-btn twblock-' + action;
-    btn.setAttribute('aria-label', displayName ? label + ' ' + displayName : label);
-    btn.title = displayName ? label + ' ' + displayName : label;
-    btn.innerHTML = getIcon(action);
-
-    btn._isActive = false;
-    btn._screenName = null;
-    const undoAction = action === 'block' ? 'unblock' : 'unmute';
-
-    btn.addEventListener('click', async (e) => {
-      e.preventDefault();
-      e.stopPropagation();
-      if (btn.disabled) return;
-
-      btn.disabled = true;
-      btn.classList.add('twblock-loading');
-
-      let screenName = btn._screenName;
-      if (!screenName) {
-        screenName = await resolveStatusAuthorScreenName(statusId);
-        if (screenName) {
-          syncResolvedScreenName(btn.closest('.twblock-btn-container'), screenName);
-        }
-      }
-
-      if (!screenName) {
-        btn.classList.remove('twblock-loading');
-        btn.classList.add('twblock-error');
-        btn.title = msg('errorOccurred');
-        btn.disabled = false;
-        setTimeout(() => btn.classList.remove('twblock-error'), 3000);
-        return;
-      }
-
-      const currentAction = btn._isActive ? undoAction : action;
-
-      if (confirmBlockFollowing && action === 'block' && !btn._isActive) {
-        const followResult = await checkFollowing(screenName);
-        if (followResult.following) {
-          btn.classList.remove('twblock-loading');
-          btn.disabled = false;
-          if (!confirm(msg('confirmBlockFollowing', screenName))) return;
-          btn.disabled = true;
-          btn.classList.add('twblock-loading');
-        }
-      }
-
-      const result = await sendAction(currentAction, screenName);
-      btn.classList.remove('twblock-loading');
-
-      if (result.success) {
-        if (!btn._isActive) {
-          btn._isActive = true;
-          btn.classList.add('twblock-success');
-          btn.innerHTML = CHECK_ICON;
-          btn.title = (action === 'block' ? msg('blockedStatus') : msg('mutedStatus')) + ' @' + screenName;
-          btn.disabled = false;
-          addBlockedUser(screenName, action);
-          showToast(msg(action === 'block' ? 'toastBlocked' : 'toastMuted', screenName));
-
-          const parentTweet = btn.closest('article[data-testid="tweet"]');
-          if (parentTweet) {
-            setTimeout(() => hideTweet(parentTweet, screenName, action), 300);
-          }
-        } else {
-          btn._isActive = false;
-          btn.classList.remove('twblock-success');
-          btn.innerHTML = getIcon(action);
-          btn.title = label + ' @' + screenName;
-          removeBlockedUser(screenName, action);
-          btn.disabled = false;
-        }
-      } else {
-        btn.classList.add('twblock-error');
-        btn.title = result.message || msg('errorOccurred');
-        btn.disabled = false;
-        setTimeout(() => btn.classList.remove('twblock-error'), 3000);
-      }
-    });
-
-    return btn;
-  }
-
   // ---- Grok/caretの行を見つけて、その中にボタンを挿入 ----
   function findGrokRow(tweet) {
     const caret = tweet.querySelector('[data-testid="caret"]');
@@ -1548,22 +1159,6 @@
     return { retweeter: href.substring(1), scRow, scLinkParent };
   }
 
-  function extractAttributionInfo(tweet) {
-    const statusLink = tweet.querySelector('a[href^="/i/status/"]');
-    if (!statusLink) return null;
-
-    const href = statusLink.getAttribute('href');
-    const match = href && href.match(/^\/i\/status\/(\d+)$/);
-    if (!match) return null;
-
-    const row = statusLink.parentElement;
-    if (!row) return null;
-
-    const displayName = statusLink.textContent ? statusLink.textContent.trim() : '';
-
-    return { statusId: match[1], row, displayName };
-  }
-
   // ツイート本文エリアからscreen_nameを抽出（socialContext内のリンクを除外）
   function extractAuthorScreenName(tweet) {
     const userName = tweet.querySelector('[data-testid="User-Name"]');
@@ -1572,57 +1167,6 @@
       if (result) return result;
     }
     return null;
-  }
-
-  function processAttributedTweet(tweet, me, authorName) {
-    const info = extractAttributionInfo(tweet);
-    if (!info) return;
-
-    const { statusId, row, displayName } = info;
-    if (!row.isConnected || row.getAttribute(ATTRIBUTION_PROCESSED) === '1') {
-      return;
-    }
-
-    let buttons = row.querySelector('.twblock-btn-container.twblock-attribution');
-    if (!buttons) {
-      buttons = createAttributionButtons(statusId, displayName);
-      if (!buttons) return;
-      buttons.classList.add('twblock-tweet', 'twblock-repost', 'twblock-attribution');
-      row.classList.add('twblock-repost-row', 'twblock-attribution-row');
-      row.appendChild(buttons);
-    }
-
-    row.setAttribute(ATTRIBUTION_PROCESSED, 'pending');
-
-    resolveStatusAuthorScreenName(statusId).then((attributedScreenName) => {
-      if (!row.isConnected || !buttons.isConnected) return;
-      if (!attributedScreenName) {
-        row.setAttribute(ATTRIBUTION_PROCESSED, 'pending');
-        return;
-      }
-
-      if (attributedScreenName === me || attributedScreenName === authorName) {
-        buttons.remove();
-        row.setAttribute(ATTRIBUTION_PROCESSED, '1');
-        return;
-      }
-
-      syncResolvedScreenName(buttons, attributedScreenName);
-      row.setAttribute(ATTRIBUTION_PROCESSED, '1');
-
-      const blockedAction = blockedUsers.get(attributedScreenName);
-      if (blockedAction) {
-        const activeBtn = buttons.querySelector('.twblock-' + blockedAction + ':not(.twblock-success)');
-        if (activeBtn) {
-          activeBtn._isActive = true;
-          activeBtn.classList.add('twblock-success');
-          activeBtn.innerHTML = CHECK_ICON;
-        }
-        if (!isViewingProfileTimeline(attributedScreenName)) {
-          hideTweet(tweet, attributedScreenName, blockedAction);
-        }
-      }
-    });
   }
 
   // ---- ボタン挿入: タイムラインツイート ----
@@ -1710,16 +1254,6 @@
       } catch (e) {
         tweet.removeAttribute(PROCESSED);
       }
-    });
-  }
-
-  function processAttributedTweets() {
-    const me = getMyScreenName();
-    const tweets = document.querySelectorAll('article[data-testid="tweet"]');
-
-    tweets.forEach((tweet) => {
-      const authorName = extractAuthorScreenName(tweet) || extractScreenName(tweet);
-      processAttributedTweet(tweet, me, authorName);
     });
   }
 
@@ -1912,7 +1446,6 @@
   // ---- メイン処理 ----
   function processAll() {
     processTweets();
-    processAttributedTweets();
     processFollowButtons();
     processTypeahead();
   }
