@@ -10,6 +10,11 @@ document.addEventListener('DOMContentLoaded', () => {
   const resetStatsBtn = document.getElementById('reset-stats');
   const statBlockedEl = document.getElementById('stat-blocked');
   const statMutedEl = document.getElementById('stat-muted');
+  const appVersionEl = document.getElementById('app-version');
+
+  if (appVersionEl) {
+    appVersionEl.textContent = 'v' + chrome.runtime.getManifest().version;
+  }
 
   // 設定読み込み
   chrome.storage.local.get(['settings', 'stats'], (data) => {

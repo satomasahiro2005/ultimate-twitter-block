@@ -55,5 +55,8 @@
   "fullReset": { "message": "拡張機能を完全リセット" },
   "confirmReset": { "message": "すべてのデータ（統計・設定）をリセットしますか？" },
 
-  "supportLabel": { "message": "サポート" }
+  "supportLabel": { "message": "サポート" },
+  "versionLabel": { "message": "バージョン" },
+  "supportTwitterLabel": { "message": "Twitter" },
+  "supportGithubLabel": { "message": "GitHub" }
 }

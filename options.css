@@ -209,31 +209,60 @@ h1 .subtitle {
 .support-links {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 10px;
 }
 
-.support-row {
+.meta-list {
+  margin-bottom: 12px;
+}
+
+.meta-row,
+.support-link {
   display: flex;
   align-items: center;
-  gap: 8px;
+  justify-content: space-between;
+  gap: 12px;
+  border: 1px solid var(--panel-border);
+  border-radius: 12px;
+  padding: 12px 14px;
+  background: light-dark(rgba(247, 249, 250, 0.9), rgba(255, 255, 255, 0.02));
 }
 
-.support-icon {
-  width: 20px;
-  text-align: center;
-  color: var(--muted);
-  font-size: 14px;
-}
-
-.support-links a {
-  color: var(--accent);
-  text-decoration: none;
-  font-size: 14px;
+.meta-label,
+.support-link-label {
+  font-size: 13px;
   font-weight: 600;
+  color: var(--muted);
 }
 
-.support-links a:hover {
-  text-decoration: underline;
+.meta-value,
+.support-link-value {
+  min-width: 0;
+  text-align: right;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text);
+  overflow-wrap: anywhere;
+}
+
+.support-link {
+  color: inherit;
+  text-decoration: none;
+  transition: border-color 0.15s ease, background-color 0.15s ease, transform 0.15s ease;
+}
+
+.support-link:hover {
+  border-color: var(--panel-border-strong);
+  background: var(--accent-soft);
+}
+
+.support-link:active {
+  transform: translateY(1px);
+}
+
+.support-link:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
 }
 
 @media (max-width: 560px) {
@@ -257,5 +286,16 @@ h1 .subtitle {
 
   .stats-row {
     grid-template-columns: 1fr;
+  }
+
+  .meta-row,
+  .support-link {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .meta-value,
+  .support-link-value {
+    text-align: left;
   }
 }

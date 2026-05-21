@@ -24,7 +24,7 @@
   const ICON_DEBUG_STORAGE_KEY = 'twblock:debug-icons';
   const MAX_ICON_DEBUG_HISTORY = 20;
   const BLOCK_ICON_SIGNATURES = new Set(['498278e7']);
-  const MUTE_ICON_SIGNATURES = new Set(['d3853445']);
+  const MUTE_ICON_SIGNATURES = new Set(['d3853445', 'f46a0eeb']);
   const ICON_SHAPE_ATTRS = {
     path: ['d', 'transform', 'fill-rule', 'clip-rule', 'stroke-width', 'stroke-linecap', 'stroke-linejoin', 'stroke-miterlimit'],
     circle: ['cx', 'cy', 'r', 'transform', 'stroke-width'],

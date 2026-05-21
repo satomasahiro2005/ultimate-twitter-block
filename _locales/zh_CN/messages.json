@@ -55,5 +55,8 @@
   "fullReset": { "message": "完全重置扩展" },
   "confirmReset": { "message": "要重置所有数据（统计和设置）吗？" },
 
-  "supportLabel": { "message": "支持" }
+  "supportLabel": { "message": "支持" },
+  "versionLabel": { "message": "版本" },
+  "supportTwitterLabel": { "message": "Twitter" },
+  "supportGithubLabel": { "message": "GitHub" }
 }

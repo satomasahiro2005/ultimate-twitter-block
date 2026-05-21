@@ -55,5 +55,8 @@
   "fullReset": { "message": "Full Reset Extension" },
   "confirmReset": { "message": "Reset all data (statistics and settings)?" },
 
-  "supportLabel": { "message": "Support" }
+  "supportLabel": { "message": "Support" },
+  "versionLabel": { "message": "Version" },
+  "supportTwitterLabel": { "message": "Twitter" },
+  "supportGithubLabel": { "message": "GitHub" }
 }
