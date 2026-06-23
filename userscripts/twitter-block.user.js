@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Ultimate Twitter Block
 // @namespace    twitter-block-userscript
-// @version      2.2.2
+// @version      2.2.3
 // @description  Add one-click block/mute buttons to tweets, profiles, and search suggestions on Twitter/X
 // @author       nemut.ai
 // @match        https://x.com/*
@@ -366,7 +366,7 @@
   // ---- 設定 ----
   let showBlock = true;
   let showMute = true;
-  let confirmBlockFollowing = false;
+  let confirmBlockFollowing = true;
 
   // ---- ブロック/ミュート済みユーザーの永続化 ----
   const blockedUsers = new Map(); // screenName → 'block' | 'mute'
@@ -426,7 +426,7 @@
         if (stored) {
           showBlock = stored.showBlock !== false;
           showMute = stored.showMute !== false;
-          confirmBlockFollowing = stored.confirmBlockFollowing === true;
+          confirmBlockFollowing = stored.confirmBlockFollowing !== false;
         }
       } catch {}
       resolve();
