@@ -23,6 +23,6 @@ The ultimate blocking tool for Twitter. Adds one-click block & mute buttons to e
 - Native UI integration — buttons blend perfectly with Twitter's design
 - Lightweight & fast — zero impact on page performance
 - Customizable — show or hide block and mute buttons independently
-- Follow protection — optional confirmation before blocking followed users
+- Follow protection: confirmation before blocking followed users, on by default
 - Statistics — track your block and mute counts
 - Supports English and Japanese
