@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Ultimate Twitter Block
 // @namespace    twitter-block-userscript
-// @version      2.2.3
+// @version      2.2.4
 // @description  Add one-click block/mute buttons to tweets, profiles, and search suggestions on Twitter/X
 // @author       nemut.ai
 // @match        https://x.com/*
