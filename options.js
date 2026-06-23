@@ -18,10 +18,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // 設定読み込み
   chrome.storage.local.get(['settings', 'stats'], (data) => {
-    const settings = data.settings || { showBlock: true, showMute: true };
+    const settings = data.settings || { showBlock: true, showMute: true, confirmBlockFollowing: true };
     showBlockEl.checked = settings.showBlock !== false;
     showMuteEl.checked = settings.showMute !== false;
-    confirmBlockFollowingEl.checked = settings.confirmBlockFollowing === true;
+    confirmBlockFollowingEl.checked = settings.confirmBlockFollowing !== false;
 
     const stats = data.stats || { blocked: 0, muted: 0 };
     statBlockedEl.textContent = stats.blocked;
@@ -56,7 +56,7 @@ document.addEventListener('DOMContentLoaded', () => {
     chrome.storage.local.clear(() => {
       chrome.storage.local.set({
         stats: { blocked: 0, muted: 0 },
-        settings: { showBlock: true, showMute: true },
+        settings: { showBlock: true, showMute: true, confirmBlockFollowing: true },
       }, () => location.reload());
     });
   });

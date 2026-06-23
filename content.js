@@ -349,7 +349,7 @@
   // ---- 設定 ----
   let showBlock = true;
   let showMute = true;
-  let confirmBlockFollowing = false;
+  let confirmBlockFollowing = true;
 
   // ---- ブロック/ミュート済みユーザーの永続化 ----
   const blockedUsers = new Map(); // screenName → 'block' | 'mute'
@@ -408,7 +408,7 @@
         if (data.settings) {
           showBlock = data.settings.showBlock !== false;
           showMute = data.settings.showMute !== false;
-          confirmBlockFollowing = data.settings.confirmBlockFollowing === true;
+          confirmBlockFollowing = data.settings.confirmBlockFollowing !== false;
         }
         resolve();
       });
@@ -1263,7 +1263,7 @@
       const newSettings = changes.settings.newValue || {};
       showBlock = newSettings.showBlock !== false;
       showMute = newSettings.showMute !== false;
-      confirmBlockFollowing = newSettings.confirmBlockFollowing === true;
+      confirmBlockFollowing = newSettings.confirmBlockFollowing !== false;
       applyButtonVisibility();
     }
     if (changes.icons) {

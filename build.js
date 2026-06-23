@@ -289,7 +289,7 @@ function buildUserscript() {
         if (stored) {
           showBlock = stored.showBlock !== false;
           showMute = stored.showMute !== false;
-          confirmBlockFollowing = stored.confirmBlockFollowing === true;
+          confirmBlockFollowing = stored.confirmBlockFollowing !== false;
         }
       } catch {}
       resolve();
