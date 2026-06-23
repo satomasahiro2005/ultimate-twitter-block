@@ -80,3 +80,7 @@ node build.js userscript # ユーザースクリプトのみ
 
 MIT
 
+## クレジット
+
+フォールバック用の一部アイコンに [Material Design Icons](https://github.com/google/material-design-icons)（Apache License 2.0）を使用しています。
+
