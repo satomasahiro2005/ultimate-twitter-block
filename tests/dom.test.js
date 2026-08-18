@@ -217,6 +217,26 @@ function startServer() {
       document.querySelectorAll('[data-testid="UserCell"] .twblock-btn-container').length);
     check('ブロック済み行(-unblock)にもボタンが出る', unblockAnchored === 1, `got ${unblockAnchored}`);
 
+    // Verified Followers / Following の行は justify-content: space-between。
+    // Followボタンと別のflexアイテムになるので、余白を山分けされて真ん中に飛びやすい
+    await page.evaluate(() => {
+      window.reset();
+      document.getElementById('root').appendChild(
+        window.buildUserCell('dora', { spaceBetween: true, testid: '4-follow' }));
+    });
+    await page.evaluate(() => new Promise((r) => setTimeout(r, 500)));
+    const spaced = await page.evaluate(() => {
+      const cell = document.querySelector('[data-testid="UserCell"]');
+      const cont = cell.querySelector('.twblock-btn-container');
+      const follow = cell.querySelector('[data-testid$="-follow"]');
+      const c = cont.getBoundingClientRect();
+      const f = follow.parentElement.getBoundingClientRect();
+      return { count: cell.querySelectorAll('.twblock-btn-container').length, gap: Math.round(f.left - c.right) };
+    });
+    check('space-between の行でもボタンが1つ', spaced.count === 1, `got ${spaced.count}`);
+    check('space-between の行でもFollowボタンの隣に並ぶ',
+      spaced.gap >= 0 && spaced.gap <= 8, `gap=${spaced.gap}px`);
+
     // ---------------------------------------------------------------
     // 2. ツイート: 二重挿入しない / RT行と本文行が別々に付く
     // ---------------------------------------------------------------

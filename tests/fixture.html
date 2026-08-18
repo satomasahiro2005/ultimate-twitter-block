@@ -29,6 +29,12 @@ window.buildUserCell = function (screenName, opts) {
 
   const rowOuter = document.createElement('div');
   rowOuter.className = 'row wide';
+  // Verified Followers / Following の行は space-between で、
+  // Followボタンは外側の行の直下にいる
+  if (opts.spaceBetween) {
+    rowOuter.style.justifyContent = 'space-between';
+    rowOuter.style.alignItems = 'center';
+  }
 
   const nameCol = document.createElement('div');
   nameCol.className = 'col';
@@ -49,7 +55,7 @@ window.buildUserCell = function (screenName, opts) {
   btn.textContent = opts.label || 'Follow';
   followChild.appendChild(btn);
 
-  if (opts.nested === false) {
+  if (opts.nested === false || opts.spaceBetween) {
     rowOuter.appendChild(followChild);
   } else {
     const rowInner = document.createElement('div');

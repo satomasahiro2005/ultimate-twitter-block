@@ -151,6 +151,11 @@
 .twblock-btn-container.twblock-sidebar {
   gap: 4px;
   flex-shrink: 0;
+  /* Verified Followers / Following の行は justify-content: space-between なので、
+     Followボタンと別のflexアイテムとして置くと空きスペースを山分けされて真ん中に飛ぶ。
+     auto マージンで余白を全部こちら側に吸わせて、Followボタンの隣に寄せる。
+     余白が無い行（Followers など）では 0 に解決されるので位置は変わらない */
+  margin-left: auto;
 }
 
 /* Followボタンを包み直す（reparent）とReactのDOM差分が壊れるので、
