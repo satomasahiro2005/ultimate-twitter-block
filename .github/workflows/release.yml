@@ -18,15 +18,28 @@ jobs:
         with:
           node-version: '20'
 
+      # ロケール整合・構文・chrome.* 漏れ・init 完走・ZIP の中身まで build.js が見る
       - name: Build ZIP and Userscript
         run: node build.js
+
+      - name: Install Chrome for DOM tests
+        uses: browser-actions/setup-chrome@v1
+        id: chrome
+
+      - name: DOM regression tests
+        env:
+          CHROME_PATH: ${{ steps.chrome.outputs.chrome-path }}
+          REQUIRE_BROWSER: '1'
+        run: |
+          npm install --no-save puppeteer-core@24
+          node tests/dom.test.js
 
       - name: Commit userscript to main
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git fetch origin main
-          git checkout main
+          git checkout -B main origin/main
           git add -f userscripts/twitter-block.user.js
           if git diff --cached --quiet; then
             echo "No userscript changes"

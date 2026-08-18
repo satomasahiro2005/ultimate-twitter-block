@@ -157,6 +157,16 @@ h1 .subtitle {
   outline-offset: 2px;
 }
 
+.btn:disabled {
+  opacity: 0.55;
+  cursor: default;
+}
+
+.btn:disabled:hover {
+  background: light-dark(rgba(255, 255, 255, 0.7), rgba(255, 255, 255, 0.02));
+  border-color: var(--panel-border);
+}
+
 .btn-danger {
   color: var(--danger);
   border-color: color-mix(in srgb, var(--danger) 34%, var(--panel-border));

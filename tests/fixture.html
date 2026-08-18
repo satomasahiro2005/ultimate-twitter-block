@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>twblock fixture</title>
+<style>
+  body { margin: 0; font-family: sans-serif; width: 600px; }
+  .row { display: flex; flex-direction: row; align-items: center; }
+  .col { display: flex; flex-direction: column; }
+  .ml12 { margin-left: 12px; }
+  .wide { width: 520px; }
+  article { display: block; border-bottom: 1px solid #ccc; padding: 8px; }
+  .actionbar { display: flex; flex-direction: row; width: 420px; justify-content: space-between; }
+</style>
+</head>
+<body>
+<div id="layers"></div>
+<nav><a data-testid="AppTabBar_Profile_Link" role="link" href="/me_myself">Profile</a></nav>
+<div id="root"></div>
+
+<script>
+// X の実DOMから採寸した構造を再現する。
+//   UserCell:  cell > rowOuter(518px flex row) > [nameCol, rowInner(209px flex row) > followChild(ml:12px) > button]
+//   nested=false のときは followChild を rowOuter の直下に置く（X が再レンダリングで実際に見せた形）
+window.buildUserCell = function (screenName, opts) {
+  opts = opts || {};
+  const cell = document.createElement('div');
+  cell.setAttribute('data-testid', 'UserCell');
+
+  const rowOuter = document.createElement('div');
+  rowOuter.className = 'row wide';
+
+  const nameCol = document.createElement('div');
+  nameCol.className = 'col';
+  const link = document.createElement('a');
+  link.setAttribute('role', 'link');
+  link.setAttribute('href', '/' + screenName);
+  link.textContent = screenName;
+  const handle = document.createElement('span');
+  handle.textContent = '@' + screenName;
+  nameCol.appendChild(link);
+  nameCol.appendChild(handle);
+  rowOuter.appendChild(nameCol);
+
+  const followChild = document.createElement('div');
+  followChild.className = 'col ml12';
+  const btn = document.createElement('button');
+  btn.setAttribute('data-testid', (opts.testid || '1234-follow'));
+  btn.textContent = opts.label || 'Follow';
+  followChild.appendChild(btn);
+
+  if (opts.nested === false) {
+    rowOuter.appendChild(followChild);
+  } else {
+    const rowInner = document.createElement('div');
+    rowInner.className = 'row';
+    rowInner.appendChild(followChild);
+    const caret = document.createElement('div');
+    caret.className = 'row';
+    caret.textContent = '⋯';
+    rowInner.appendChild(caret);
+    rowOuter.appendChild(rowInner);
+  }
+
+  cell.appendChild(rowOuter);
+  return cell;
+};
+
+window.buildTweet = function (screenName, opts) {
+  opts = opts || {};
+  const article = document.createElement('article');
+  article.setAttribute('data-testid', 'tweet');
+
+  const inner = document.createElement('div');
+  article.appendChild(inner);
+
+  if (opts.retweeter) {
+    const scLink = document.createElement('a');
+    scLink.setAttribute('href', '/' + opts.retweeter);
+    const scWrap = document.createElement('div');
+    scWrap.className = 'col';
+    const sc = document.createElement('span');
+    sc.setAttribute('data-testid', 'socialContext');
+    sc.textContent = opts.retweeter + ' reposted';
+    scLink.appendChild(sc);
+    scWrap.appendChild(scLink);
+    inner.appendChild(scWrap);
+  }
+
+  const userName = document.createElement('div');
+  userName.setAttribute('data-testid', 'User-Name');
+  const link = document.createElement('a');
+  link.setAttribute('role', 'link');
+  link.setAttribute('href', '/' + screenName);
+  link.textContent = screenName;
+  userName.appendChild(link);
+  inner.appendChild(userName);
+
+  const text = document.createElement('div');
+  text.textContent = 'tweet body for ' + screenName;
+  inner.appendChild(text);
+
+  const bar = document.createElement('div');
+  bar.className = 'actionbar';
+  for (const name of ['reply', 'retweet', 'like', 'bookmark']) {
+    const slot = document.createElement('div');
+    slot.className = 'row';
+    slot.textContent = name;
+    bar.appendChild(slot);
+  }
+  const grokSlot = document.createElement('div');
+  grokSlot.className = 'row';
+  const grok = document.createElement('button');
+  grok.setAttribute('aria-label', 'Grok actions');
+  grok.textContent = 'grok';
+  grokSlot.appendChild(grok);
+  bar.appendChild(grokSlot);
+
+  const caretSlot = document.createElement('div');
+  caretSlot.className = 'row';
+  const caret = document.createElement('button');
+  caret.setAttribute('data-testid', 'caret');
+  caret.textContent = '⋯';
+  caretSlot.appendChild(caret);
+  bar.appendChild(caretSlot);
+
+  inner.appendChild(bar);
+  return article;
+};
+
+window.buildProfile = function (screenName) {
+  const wrap = document.createElement('div');
+  wrap.setAttribute('data-testid', 'primaryColumn');
+  const header = document.createElement('div');
+  header.className = 'col';
+
+  const actionRow = document.createElement('div');
+  actionRow.className = 'row';
+  const more = document.createElement('button');
+  more.setAttribute('data-testid', 'userActions');
+  more.textContent = '⋯';
+  actionRow.appendChild(more);
+
+  const placement = document.createElement('div');
+  placement.className = 'col';
+  placement.setAttribute('data-testid', 'placementTracking');
+  const btn = document.createElement('button');
+  btn.setAttribute('data-testid', '9999-follow');
+  btn.textContent = 'Follow';
+  placement.appendChild(btn);
+  actionRow.appendChild(placement);
+  header.appendChild(actionRow);
+
+  const userName = document.createElement('div');
+  userName.setAttribute('data-testid', 'UserName');
+  const link = document.createElement('a');
+  link.setAttribute('role', 'link');
+  link.setAttribute('href', '/' + screenName);
+  link.textContent = screenName;
+  const handle = document.createElement('span');
+  handle.textContent = '@' + screenName;
+  userName.appendChild(link);
+  userName.appendChild(handle);
+  header.appendChild(userName);
+
+  wrap.appendChild(header);
+  return wrap;
+};
+
+window.reset = function () {
+  document.getElementById('root').textContent = '';
+};
+</script>
+</body>
+</html>

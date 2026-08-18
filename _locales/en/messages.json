@@ -51,9 +51,33 @@
   "resetStats": { "message": "Reset Statistics" },
 
   "sectionReset": { "message": "Reset" },
-  "resetHint": { "message": "Reset all data (statistics, icons, settings) to defaults" },
+  "resetHint": { "message": "Reset everything (statistics, icons, settings, and the local block/mute history) to defaults" },
   "fullReset": { "message": "Full Reset Extension" },
   "confirmReset": { "message": "Reset all data (statistics and settings)?" },
+
+  "switchToBlockLabel": { "message": "Switch to block" },
+  "forceShowLabel": { "message": "Show anyway" },
+  "reloadLabel": { "message": "Reload" },
+  "dismissLabel": { "message": "Dismiss" },
+  "profileStaleHint": { "message": "X's own view stays as-is until you reload" },
+  "errorNoAuth": { "message": "Could not read your session. Interact with the page and try again." },
+  "errorForbidden": { "message": "Your session expired. Reload the page." },
+  "errorRateLimited": { "message": "Rate limited. Wait a moment and try again." },
+  "errorNetwork": { "message": "Network error" },
+  "reloadAfterProfileBlockLabel": { "message": "Reload the page after blocking from a profile" },
+  "toastStateSynced": {
+    "message": "Synced the state of @$USER$",
+    "placeholders": { "user": { "content": "$1" } }
+  },
+  "errorHttp": {
+    "message": "Request failed (HTTP $CODE$)",
+    "placeholders": { "code": { "content": "$1" } }
+  },
+
+  "confirmBlockUnknown": {
+    "message": "Could not check whether you follow @$USER$. Block anyway?",
+    "placeholders": { "user": { "content": "$1" } }
+  },
 
   "supportLabel": { "message": "Support" },
   "versionLabel": { "message": "Version" },

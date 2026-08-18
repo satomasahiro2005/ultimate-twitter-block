@@ -5,10 +5,19 @@
   window.__twblockInjected = true;
 
   const PROCESSED = 'data-twblock';
+  const AUTHOR_ATTR = 'data-twblock-author';
+  const QUOTED_ATTR = 'data-twblock-quoted';
+  const RETWEETER_ATTR = 'data-twblock-retweeter';
+  const RETRY_ATTR = 'data-twblock-retry';
+  const HIDDEN_LAYER_ATTR = 'data-twblock-hidden-layer';
+  const COLLAPSED_ATTR = 'data-twblock-collapsed';
+  const MAX_TWEET_RETRIES = 5;
   const RESERVED_PATHS = new Set([
     'home', 'explore', 'search', 'notifications', 'messages',
     'settings', 'i', 'compose', 'login', 'logout', 'signup',
     'tos', 'privacy', 'about', 'help', 'jobs', 'download',
+    'bookmarks', 'lists', 'topics', 'communities', 'connect_people',
+    'intent', 'hashtag', 'account', 'notifications_timeline',
   ]);
   const PROFILE_SUBPATHS = new Set([
     'with_replies', 'media', 'likes', 'highlights', 'articles',
@@ -23,6 +32,7 @@
   const SVG_NS = 'http://www.w3.org/2000/svg';
   const ICON_DEBUG_STORAGE_KEY = 'twblock:debug-icons';
   const MAX_ICON_DEBUG_HISTORY = 20;
+  const MAX_ICON_SIGNATURES = 8;
   const BLOCK_ICON_SIGNATURES = new Set(['498278e7']);
   const MUTE_ICON_SIGNATURES = new Set(['d3853445', 'f46a0eeb']);
   const ICON_SHAPE_ATTRS = {
@@ -53,11 +63,90 @@
   const iconDebugHistory = [];
 
   const CHECK_ICON =
-    '<svg viewBox="0 0 24 24" width="20" height="20"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41L9 16.17z" fill="currentColor"/></svg>';
+    '<svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41L9 16.17z" fill="currentColor"/></svg>';
 
-  function escapeAttr(s) {
-    return s.replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  /* @twblock:store-start */
+  // ---- ストレージ抽象（build.js がユーザースクリプト版で localStorage 実装に差し替える） ----
+  const store = {
+    get(keys) {
+      return new Promise((resolve) => {
+        try {
+          chrome.storage.local.get(keys, (data) => resolve(data || {}));
+        } catch (err) {
+          resolve({});
+        }
+      });
+    },
+    set(obj) {
+      return new Promise((resolve) => {
+        try {
+          chrome.storage.local.set(obj, () => resolve());
+        } catch (err) {
+          resolve();
+        }
+      });
+    },
+    remove(keys) {
+      return new Promise((resolve) => {
+        try {
+          chrome.storage.local.remove(keys, () => resolve());
+        } catch (err) {
+          resolve();
+        }
+      });
+    },
+    onChanged(callback) {
+      try {
+        chrome.storage.onChanged.addListener((changes, area) => {
+          if (area && area !== 'local') return;
+          callback(changes);
+        });
+      } catch (err) {
+        // ストレージイベントを購読できない環境では何もしない
+      }
+    },
+    getPageScriptUrl() {
+      return chrome.runtime.getURL('pageScript.js');
+    },
+  };
+  /* @twblock:store-end */
+
+  // ---- i18n（init時にキャッシュして、処理中は chrome.* を触らない） ----
+  /* @twblock:i18n-start */
+  const _msg = chrome.i18n.getMessage.bind(chrome.i18n);
+  /* @twblock:i18n-end */
+
+  const i18n = {};
+  // 拡張の更新直後は古いコンテンツスクリプトが残り、chrome.* が
+  // "Extension context invalidated" を投げる。文言が出ないだけで済ませる。
+  function cacheI18n() {
+    for (const k of I18N_CACHE_KEYS) {
+      try { i18n[k] = _msg(k); } catch (err) { i18n[k] = ''; }
+    }
   }
+  function msg(key, sub) {
+    try {
+      if (sub != null) return _msg(key, [String(sub)]);
+      return i18n[key] || _msg(key) || key;
+    } catch (err) {
+      return i18n[key] || key;
+    }
+  }
+
+  const I18N_CACHE_KEYS = [
+    'blockLabel', 'muteLabel', 'blockedStatus', 'mutedStatus',
+    'unblockLabel', 'unmuteLabel', 'switchToBlockLabel', 'forceShowLabel',
+    'reloadLabel', 'profileStaleHint',
+    'errorTimeout', 'errorOccurred', 'errorNoAuth', 'errorForbidden',
+    'errorRateLimited', 'errorNetwork', 'errorHttp', 'dismissLabel',
+    'toastBlocked', 'toastMuted', 'toastUnblocked', 'toastUnmuted',
+    'toastStateSynced', 'confirmBlockFollowing', 'confirmBlockUnknown',
+  ];
+
+  /* @twblock:css-start */
+  // 拡張機能版は manifest の content_scripts.css で読み込むため何もしない
+  function injectCSS() {}
+  /* @twblock:css-end */
 
   function normalizeSpace(value) {
     return String(value || '').replace(/\s+/g, ' ').trim();
@@ -78,7 +167,14 @@
 
   function rememberIconSignature(action, signature) {
     if (!signature) return;
-    getIconSignatureSet(action).add(signature);
+    const set = getIconSignatureSet(action);
+    if (set.has(signature)) return;
+    // 誤マッチした署名が無限に溜まらないよう上限を設ける
+    if (set.size >= MAX_ICON_SIGNATURES) {
+      const oldest = set.values().next().value;
+      set.delete(oldest);
+    }
+    set.add(signature);
   }
 
   function loadStoredIconSignatures(signatures) {
@@ -99,7 +195,7 @@
   }
 
   function persistIcons() {
-    chrome.storage.local.set({
+    store.set({
       icons: {
         version: ICON_CACHE_VERSION,
         block: BLOCK_ICON,
@@ -331,56 +427,153 @@
     return MUTE_ICON || FALLBACK_MUTE_ICON;
   }
 
-  // ---- i18n ヘルパー（init時にキャッシュ、処理中はchrome.*不使用） ----
-  const _msg = chrome.i18n.getMessage.bind(chrome.i18n);
-  const i18n = {};
-  function cacheI18n() {
-    const keys = [
-      'blockLabel', 'muteLabel', 'blockedStatus', 'mutedStatus',
-      'unblockLabel', 'unmuteLabel', 'errorTimeout', 'errorOccurred',
-    ];
-    for (const k of keys) i18n[k] = _msg(k);
+  // ---- エラーメッセージ（pageScript はコードだけ返し、文言はここで解決する） ----
+  const ERROR_MESSAGE_KEYS = {
+    TIMEOUT: 'errorTimeout',
+    NO_AUTH: 'errorNoAuth',
+    FORBIDDEN: 'errorForbidden',
+    RATE_LIMITED: 'errorRateLimited',
+    NETWORK: 'errorNetwork',
+  };
+
+  function errorMessage(result) {
+    if (!result) return msg('errorOccurred');
+    const key = ERROR_MESSAGE_KEYS[result.error];
+    if (key) return msg(key);
+    if (typeof result.error === 'string' && result.error.indexOf('HTTP_') === 0) {
+      return msg('errorHttp', result.error.slice(5));
+    }
+    return msg('errorOccurred');
   }
-  function msg(key, sub) {
-    if (sub != null) return _msg(key, [sub]);
-    return i18n[key] || _msg(key) || key;
+
+  // 「もうその状態ではない」= 解除操作としては達成済みとみなすAPIエラーコード
+  //   272 You are not muting the specified user.（実測: HTTP 403 で返る）
+  //   34 / 50 ページ・ユーザーが存在しない, 63 凍結済み
+  const CLEARED_ERROR_CODES = new Set([272, 34, 50, 63]);
+
+  function isUndoSettled(result) {
+    if (!result) return false;
+    if (result.success) return true;
+    return CLEARED_ERROR_CODES.has(Number(result.code));
   }
 
   // ---- 設定 ----
   let showBlock = true;
   let showMute = true;
   let confirmBlockFollowing = true;
+  let reloadAfterProfileBlock = false;
 
-  // ---- ブロック/ミュート済みユーザーの永続化 ----
-  const blockedUsers = new Map(); // screenName → 'block' | 'mute'
+  // ---- ブロック/ミュート状態の永続化 ----
+  // 記録はアカウントで分けない（同じ相手はどのアカウントでも見たくない、という運用）。
+  // v1 は 1ユーザー1状態だったが、ブロックとミュートは同時に持てるので {b, m} に変えた。
+  const STORAGE_KEY = 'blockedUsersV2';
+  const LEGACY_STORAGE_KEY = 'blockedUsers';
 
+  // キーは小文字化した screen_name、値は { b: 0|1, m: 0|1 }
+  const blockedUsers = new Map();
+  // 自分で書いた内容で onChanged が跳ね返ってきたときの空回りを防ぐ
+  let lastWrittenSnapshot = '';
+  // まだストレージに書けていないローカル変更のキー。
+  // 保存デバウンス中に他タブの内容で上書きされて消えるのを防ぐ
+  const pendingSaveKeys = new Set();
+
+  function nameKey(screenName) {
+    return String(screenName || '').toLowerCase();
+  }
+
+  function normalizeState(value) {
+    if (!value) return null;
+    if (typeof value === 'string') {
+      if (value === 'block') return { b: 1, m: 0 };
+      if (value === 'mute') return { b: 0, m: 1 };
+      return null;
+    }
+    const state = { b: value.b ? 1 : 0, m: value.m ? 1 : 0 };
+    return (state.b || state.m) ? state : null;
+  }
+
+  function normalizeStateMap(raw) {
+    const out = {};
+    if (!raw || typeof raw !== 'object') return out;
+    for (const [name, value] of Object.entries(raw)) {
+      const state = normalizeState(value);
+      if (!state) continue;
+      const key = nameKey(name);
+      const prev = out[key];
+      out[key] = prev ? { b: prev.b || state.b, m: prev.m || state.m } : state;
+    }
+    return out;
+  }
+
+  function getUserState(screenName) {
+    return blockedUsers.get(nameKey(screenName)) || null;
+  }
+
+  function stateHas(state, action) {
+    if (!state) return false;
+    return action === 'block' ? Boolean(state.b) : Boolean(state.m);
+  }
+
+  function primaryAction(state) {
+    if (!state) return null;
+    return state.b ? 'block' : 'mute';
+  }
+
+  function setUserState(screenName, action, on) {
+    const key = nameKey(screenName);
+    const current = blockedUsers.get(key) || { b: 0, m: 0 };
+    const next = { b: current.b, m: current.m };
+    if (action === 'block') next.b = on ? 1 : 0;
+    else next.m = on ? 1 : 0;
+    if (next.b || next.m) blockedUsers.set(key, next);
+    else blockedUsers.delete(key);
+    pendingSaveKeys.add(key);
+    saveBlockedUsers();
+    return blockedUsers.get(key) || null;
+  }
+
+  let initialLoadDone = false;
   function loadBlockedUsers() {
-    return new Promise((resolve) => {
-      chrome.storage.local.get('blockedUsers', (data) => {
-        if (data.blockedUsers) {
-          for (const [k, v] of Object.entries(data.blockedUsers)) {
-            blockedUsers.set(k, v);
-          }
-        }
-        resolve();
-      });
+    return store.get([STORAGE_KEY, LEGACY_STORAGE_KEY]).then((data) => {
+      blockedUsers.clear();
+      let current = (data[STORAGE_KEY] && typeof data[STORAGE_KEY] === 'object') ? data[STORAGE_KEY] : null;
+
+      // v1（値が 'block' / 'mute' の文字列）からの移行を1度だけ行う
+      const legacy = data[LEGACY_STORAGE_KEY];
+      if (!current && legacy && typeof legacy === 'object') {
+        current = normalizeStateMap(legacy);
+        store.set({ [STORAGE_KEY]: current });
+        store.remove(LEGACY_STORAGE_KEY);
+      }
+
+      const normalized = normalizeStateMap(current);
+      for (const [key, state] of Object.entries(normalized)) blockedUsers.set(key, state);
+      lastWrittenSnapshot = JSON.stringify(Object.fromEntries(blockedUsers));
+      initialLoadDone = true;
     });
   }
 
+  let saveTimer = null;
   function saveBlockedUsers() {
-    chrome.storage.local.set({ blockedUsers: Object.fromEntries(blockedUsers) });
+    if (saveTimer) clearTimeout(saveTimer);
+    saveTimer = setTimeout(flushBlockedUsers, 150);
   }
 
-  function addBlockedUser(screenName, action) {
-    blockedUsers.set(screenName, action);
-    saveBlockedUsers();
+  function flushBlockedUsers() {
+    saveTimer = null;
+    const snapshot = Object.fromEntries(blockedUsers);
+    lastWrittenSnapshot = JSON.stringify(snapshot);
+    pendingSaveKeys.clear();
+    return store.set({ [STORAGE_KEY]: snapshot });
   }
 
-  function removeBlockedUser(screenName, action) {
-    if (blockedUsers.get(screenName) === action) {
-      blockedUsers.delete(screenName);
-      saveBlockedUsers();
-    }
+  function countStat(action) {
+    store.get('stats').then((data) => {
+      const stats = (data.stats && typeof data.stats === 'object') ? data.stats : { blocked: 0, muted: 0 };
+      if (action === 'block') stats.blocked = (Number(stats.blocked) || 0) + 1;
+      else stats.muted = (Number(stats.muted) || 0) + 1;
+      store.set({ stats });
+    });
   }
 
   // ---- アイコン更新（ストレージ or パッシブ監視） ----
@@ -388,39 +581,39 @@
 
   // ストレージから保存済みアイコンを読み込み
   function loadStoredIcons() {
-    return new Promise((resolve) => {
-      chrome.storage.local.get('icons', (data) => {
-        if (data.icons) {
-          if (data.icons.block) BLOCK_ICON = data.icons.block;
-          if (data.icons.mute) MUTE_ICON = data.icons.mute;
-          loadStoredIconSignatures(data.icons.signatures);
-          iconsExtracted = Boolean(BLOCK_ICON && MUTE_ICON);
-        }
-        resolve();
-      });
+    return store.get('icons').then((data) => {
+      if (data.icons) {
+        if (data.icons.block) BLOCK_ICON = data.icons.block;
+        if (data.icons.mute) MUTE_ICON = data.icons.mute;
+        loadStoredIconSignatures(data.icons.signatures);
+        iconsExtracted = Boolean(BLOCK_ICON && MUTE_ICON);
+      }
     });
   }
 
   // 設定を読み込み
   function loadSettings() {
-    return new Promise((resolve) => {
-      chrome.storage.local.get('settings', (data) => {
-        if (data.settings) {
-          showBlock = data.settings.showBlock !== false;
-          showMute = data.settings.showMute !== false;
-          confirmBlockFollowing = data.settings.confirmBlockFollowing !== false;
-        }
-        resolve();
-      });
+    return store.get('settings').then((data) => {
+      applySettings(data.settings);
     });
+  }
+
+  function applySettings(settings) {
+    const s = settings || {};
+    showBlock = s.showBlock !== false;
+    showMute = s.showMute !== false;
+    confirmBlockFollowing = s.confirmBlockFollowing !== false;
+    reloadAfterProfileBlock = s.reloadAfterProfileBlock === true;
   }
 
   // 既存ボタンのアイコンを一括差し替え
   function replaceAllButtonIcons() {
     document.querySelectorAll('.twblock-block:not(.twblock-success)').forEach(btn => {
+      if (btn.classList.contains('twblock-loading')) return;
       btn.innerHTML = getIcon('block');
     });
     document.querySelectorAll('.twblock-mute:not(.twblock-success)').forEach(btn => {
+      if (btn.classList.contains('twblock-loading')) return;
       btn.innerHTML = getIcon('mute');
     });
   }
@@ -469,21 +662,34 @@
     snapshot.muteSignatureCount = MUTE_ICON_SIGNATURES.size;
     recordIconDebugSnapshot(snapshot);
 
-    if (foundBlock || foundMute) {
-      if (foundBlock) BLOCK_ICON = nextBlockIcon;
-      if (foundMute) MUTE_ICON = nextMuteIcon;
-      iconsExtracted = Boolean(BLOCK_ICON && MUTE_ICON);
+    const changed = (foundBlock && nextBlockIcon !== BLOCK_ICON) || (foundMute && nextMuteIcon !== MUTE_ICON);
+    if (foundBlock) BLOCK_ICON = nextBlockIcon;
+    if (foundMute) MUTE_ICON = nextMuteIcon;
+    iconsExtracted = Boolean(BLOCK_ICON && MUTE_ICON);
+    if (changed) {
       persistIcons();
       replaceAllButtonIcons();
     }
+    return foundBlock || foundMute;
   }
 
-  // アクティブ取得: layersを非表示にしてメニューを開き、アイコン抽出後にメニュー要素をdisplay:noneで隠す
+  // アクティブ取得: layersを非表示にしてメニューを開き、アイコン抽出後にEscapeで閉じる
   let extractRetries = 0;
+  let extractStarted = false;
   function extractIconsOnce() {
-    if (iconsExtracted) return;
+    if (iconsExtracted || extractStarted) return;
 
-    const caret = document.querySelector('[data-testid="caret"]');
+    // 自分のツイートのメニューには Block/Mute が無いので、他人のツイートのcaretを選ぶ
+    const me = getMyScreenName();
+    let caret = null;
+    for (const tweet of document.querySelectorAll('article[data-testid="tweet"]')) {
+      const author = extractAuthorScreenName(tweet);
+      if (author && me && nameKey(author) === nameKey(me)) continue;
+      const c = tweet.querySelector('[data-testid="caret"]');
+      if (c) { caret = c; break; }
+    }
+    if (!caret) caret = document.querySelector('[data-testid="caret"]');
+
     const layers = document.getElementById('layers');
     if (!caret || !layers) {
       if (++extractRetries <= 5) {
@@ -492,52 +698,94 @@
       return;
     }
 
-    // メニュー展開前の#layers子要素を記録
-    const childrenBefore = new Set(layers.children);
+    extractStarted = true;
 
-    // メニューを見えなくする
+    // 自分が開ける前から居た子を控えておく（後始末の対象を自分の分だけに絞る）
+    const layerChildrenBefore = new Set(Array.from(layers.children));
+
+    // メニューが閉じきるまで layers を隠しておく
     layers.style.visibility = 'hidden';
-
-    // MutationObserverでメニュー出現を即検知
-    const mo = new MutationObserver(() => {
-      const menuItems = document.querySelectorAll('[role="menuitem"]');
-      if (menuItems.length === 0) return;
-
+    let finished = false;
+    let hardTimeout = null;
+    const finish = () => {
+      if (finished) return;
+      finished = true;
       mo.disconnect();
-      extractIconsFromMenuItems(menuItems);
-
-      // layersのvisibilityを復元
-      layers.style.visibility = '';
-
-      // メニューで追加された要素をdisplay:noneで隠す
-      // DOM削除するとReactのfiber treeが壊れるため、非表示にするだけ
-      for (const child of layers.children) {
-        if (!childrenBefore.has(child)) {
+      clearTimeout(hardTimeout);
+      // Escape が効かずメニューが残っていたら、開けた分だけ畳んでおく。
+      // 押していないメニューが出っぱなしになるより良い。
+      // 印を付けておき、メニューでなくなった時点で releaseHiddenLayers が必ず戻す
+      if (document.querySelectorAll('[role="menuitem"]').length) {
+        for (const child of layers.children) {
+          if (layerChildrenBefore.has(child)) continue;
           child.style.display = 'none';
+          child.setAttribute(HIDDEN_LAYER_ATTR, '1');
         }
       }
+      layers.style.visibility = '';
+    };
+
+    // X はメニューを開くとメニュー要素にフォーカスを移し、そこで Escape を待っている。
+    // document や caret に投げても閉じない（実機で確認済み）
+    const closeMenu = () => {
+      const target = document.activeElement || document.body;
+      const opts = { key: 'Escape', code: 'Escape', keyCode: 27, which: 27, bubbles: true, cancelable: true };
+      target.dispatchEvent(new KeyboardEvent('keydown', opts));
+      target.dispatchEvent(new KeyboardEvent('keyup', opts));
+    };
+
+    let extracted = false;
+    const mo = new MutationObserver(() => {
+      const menuItems = document.querySelectorAll('[role="menuitem"]');
+      if (!extracted) {
+        if (menuItems.length === 0) return;
+        extracted = true;
+        extractIconsFromMenuItems(menuItems);
+        closeMenu();
+        // フォーカスが移る前に撃ってしまった場合に備えてもう一度
+        setTimeout(closeMenu, 300);
+        return;
+      }
+      // 抽出後: メニューが閉じたのを確認してから visibility を戻す
+      if (menuItems.length === 0) finish();
     });
 
     mo.observe(layers, { childList: true, subtree: true });
     caret.click();
 
-    // タイムアウト: 3秒以内に完了しなければ中止
-    setTimeout(() => {
-      mo.disconnect();
-      layers.style.visibility = '';
+    // タイムアウト: 3秒以内に閉じきらなければ強制的に復帰させる
+    hardTimeout = setTimeout(() => {
+      closeMenu();
+      setTimeout(finish, 200);
     }, 3000);
   }
 
+  // 抽出のために隠した #layers の子を、メニューでなくなったら戻す。
+  // X はこのコンテナを後のモーダルに使い回すので、隠しっぱなしにはできない
+  function releaseHiddenLayers() {
+    document.querySelectorAll('[' + HIDDEN_LAYER_ATTR + ']').forEach((el) => {
+      if (el.querySelector('[role="menuitem"]')) return;
+      el.style.display = '';
+      el.removeAttribute(HIDDEN_LAYER_ATTR);
+    });
+  }
+
   // パッシブ監視: ユーザーが⋯メニューを開いた時にアイコンを抽出・更新
+  let layersDebounceTimer = null;
+  let layersRetries = 0;
   function observeLayers() {
     const layers = document.getElementById('layers');
     if (!layers) {
-      setTimeout(observeLayers, 1000);
+      // 見つからない環境で永久にタイマーを積まないよう上限を持たせる
+      if (++layersRetries <= 30) setTimeout(observeLayers, 1000);
       return;
     }
 
     const layersObserver = new MutationObserver(() => {
-      setTimeout(() => {
+      if (layersDebounceTimer) clearTimeout(layersDebounceTimer);
+      layersDebounceTimer = setTimeout(() => {
+        layersDebounceTimer = null;
+        releaseHiddenLayers();
         const menuItems = document.querySelectorAll('[role="menuitem"]');
         if (menuItems.length > 0) extractIconsFromMenuItems(menuItems);
       }, 300);
@@ -546,64 +794,118 @@
     layersObserver.observe(layers, { childList: true, subtree: true });
   }
 
+  /* @twblock:pagescript-start */
   // ---- ページスクリプト注入 ----
   function injectPageScript() {
-    const s = document.createElement('script');
-    s.src = chrome.runtime.getURL('pageScript.js');
-    s.onload = function () { this.remove(); };
-    (document.head || document.documentElement).appendChild(s);
+    if (window.__twblockPageScriptInjected) return;
+    window.__twblockPageScriptInjected = true;
+    try {
+      const s = document.createElement('script');
+      s.src = store.getPageScriptUrl();
+      s.onload = function () { this.remove(); };
+      (document.head || document.documentElement).appendChild(s);
+    } catch (err) {
+      // 拡張の更新直後など。ボタンは出るが操作は失敗する
+      console.warn('[twblock] pageScript injection failed', err);
+    }
   }
+  /* @twblock:pagescript-end */
 
   // ---- メッセージブリッジ ----
   const pending = new Map();
+  // タイムアウト後に遅れて届いた結果を拾うための記録
+  const lateRequests = new Map();
   let reqId = 0;
 
-  function sendAction(action, screenName) {
+  async function postRequest(payload, timeoutMs, timeoutValue, onLate) {
+    await waitForPageScript();
     return new Promise((resolve) => {
       const id = '__twb_' + ++reqId;
       pending.set(id, resolve);
-      window.postMessage(
-        { type: '__TWBLOCK_ACTION', action, screenName, requestId: id },
-        '*'
-      );
+      window.postMessage(Object.assign({ requestId: id }, payload), '*');
       setTimeout(() => {
         if (pending.has(id)) {
           pending.delete(id);
-          resolve({ success: false, error: 'TIMEOUT', message: msg('errorTimeout') });
+          if (onLate) {
+            // pageScript が死んでいると溜まる一方なので上限を設ける
+            if (lateRequests.size >= 50) {
+              lateRequests.delete(lateRequests.keys().next().value);
+            }
+            lateRequests.set(id, onLate);
+          }
+          resolve(timeoutValue);
         }
-      }, 15000);
+      }, timeoutMs);
     });
   }
 
+  function sendAction(action, screenName) {
+    return postRequest(
+      { type: '__TWBLOCK_ACTION', action, screenName },
+      20000,
+      { success: false, error: 'TIMEOUT' },
+      (result) => {
+        // 遅れて返ってきた結果でローカル状態を実態に合わせる。
+        // 解除は「もうその状態でない」も達成として扱う
+        const undo = action === 'unblock' || action === 'unmute';
+        const settled = undo ? isUndoSettled(result) : Boolean(result && result.success);
+        if (!settled) return;
+        if (action === 'block') setUserState(screenName, 'block', 1);
+        else if (action === 'mute') setUserState(screenName, 'mute', 1);
+        else if (action === 'unblock') setUserState(screenName, 'block', 0);
+        else if (action === 'unmute') setUserState(screenName, 'mute', 0);
+        syncButtons(screenName);
+        refreshHiddenForUser(screenName);
+        // タイムアウト表示のあとで黙って状態が変わると分からないので知らせる
+        showToast(msg('toastStateSynced', screenName));
+      }
+    );
+  }
+
   function checkFollowing(screenName) {
+    return postRequest(
+      { type: '__TWBLOCK_CHECK_FOLLOWING', screenName },
+      8000,
+      { following: false, unknown: true }
+    );
+  }
+
+  let pageScriptReady = false;
+  const readyWaiters = [];
+
+  function waitForPageScript() {
+    if (pageScriptReady) return Promise.resolve();
     return new Promise((resolve) => {
-      const id = '__twb_' + ++reqId;
-      pending.set(id, resolve);
-      window.postMessage(
-        { type: '__TWBLOCK_CHECK_FOLLOWING', screenName, requestId: id },
-        '*'
-      );
-      setTimeout(() => {
-        if (pending.has(id)) {
-          pending.delete(id);
-          resolve({ following: false });
-        }
-      }, 5000);
+      readyWaiters.push(resolve);
+      // 準備完了通知を取りこぼしても止まらないよう、待つのは3秒まで
+      setTimeout(resolve, 3000);
     });
   }
 
   window.addEventListener('message', (e) => {
     if (e.source !== window || !e.data) return;
+    if (e.data.type === '__TWBLOCK_READY') {
+      pageScriptReady = true;
+      while (readyWaiters.length) readyWaiters.shift()();
+      return;
+    }
     if (e.data.type !== '__TWBLOCK_RESULT') return;
     const cb = pending.get(e.data.requestId);
     if (cb) {
       pending.delete(e.data.requestId);
       cb(e.data);
+      return;
+    }
+    const late = lateRequests.get(e.data.requestId);
+    if (late) {
+      lateRequests.delete(e.data.requestId);
+      try { late(e.data); } catch (err) { /* noop */ }
     }
   });
 
   // ---- screen_name 抽出 ----
   function extractScreenName(el) {
+    if (!el) return null;
     const links = el.querySelectorAll('a[role="link"]');
     for (const link of links) {
       const href = link.getAttribute('href');
@@ -651,7 +953,7 @@
 
   function isViewingProfileTimeline(screenName) {
     const info = getProfilePathInfo();
-    return Boolean(info && info.screenName.toLowerCase() === screenName.toLowerCase());
+    return Boolean(info && nameKey(info.screenName) === nameKey(screenName));
   }
 
   let myScreenName = null;
@@ -665,7 +967,11 @@
     return null;
   }
 
-  // ---- トースト通知 ----
+  function isMe(screenName) {
+    const me = getMyScreenName();
+    return Boolean(me && screenName && nameKey(me) === nameKey(screenName));
+  }
+
   // ---- Twitterアクセントカラー取得 ----
   const ACCENT_COLORS = new Set([
     'rgb(29, 155, 240)',   // Blue
@@ -679,13 +985,10 @@
   let cachedAccentColor = null;
 
   function loadStoredAccentColor() {
-    return new Promise((resolve) => {
-      chrome.storage.local.get('accentColor', (data) => {
-        if (data.accentColor && ACCENT_COLORS.has(data.accentColor)) {
-          cachedAccentColor = data.accentColor;
-        }
-        resolve();
-      });
+    return store.get('accentColor').then((data) => {
+      if (data.accentColor && ACCENT_COLORS.has(data.accentColor)) {
+        cachedAccentColor = data.accentColor;
+      }
     });
   }
 
@@ -697,7 +1000,7 @@
         if (ACCENT_COLORS.has(bg)) {
           if (bg !== cachedAccentColor) {
             cachedAccentColor = bg;
-            chrome.storage.local.set({ accentColor: bg });
+            store.set({ accentColor: bg });
           }
           return bg;
         }
@@ -706,97 +1009,284 @@
     return cachedAccentColor || DEFAULT_ACCENT;
   }
 
+  // ---- トースト通知 ----
   function showToast(message) {
     const existing = document.querySelector('.twblock-toast');
     if (existing) existing.remove();
 
     const toast = document.createElement('div');
     toast.className = 'twblock-toast';
+    toast.setAttribute('role', 'status');
+    toast.setAttribute('aria-live', 'polite');
     toast.textContent = message;
     toast.style.backgroundColor = getAccentColor();
     document.body.appendChild(toast);
 
     setTimeout(() => {
+      if (!toast.isConnected) return;
       toast.classList.add('twblock-toast-hide');
       setTimeout(() => toast.remove(), 300);
     }, 3000);
   }
 
-  // ---- ツイート非表示（共通ロジック） ----
-  function createHiddenBar(screenName, action, onUndo) {
+  // ---- 状態バー（非表示バー / プロフィール通知バー 共通） ----
+  function makeBarButton(label, extraClass) {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'twblock-show-btn' + (extraClass ? ' ' + extraClass : '');
+    btn.textContent = label;
+    return btn;
+  }
+
+  function createStateBar(screenName, options) {
     const bar = document.createElement('div');
-    bar.className = 'twblock-hidden-bar';
-    const statusLabel = action === 'block' ? msg('blockedStatus') : msg('mutedStatus');
-    const undoLabel = action === 'block' ? msg('unblockLabel') : msg('unmuteLabel');
-    const undoAction = action === 'block' ? 'unblock' : 'unmute';
-    const undoToastKey = action === 'block' ? 'toastUnblocked' : 'toastUnmuted';
-    bar.innerHTML =
-      '<span class="twblock-hidden-label">' + statusLabel + ' @' + screenName + '</span>' +
-      '<button class="twblock-show-btn">' + undoLabel + '</button>';
-
-    bar.querySelector('.twblock-show-btn').addEventListener('click', async (e) => {
-      e.preventDefault();
-      e.stopPropagation();
-      const btn = e.currentTarget;
-      btn.disabled = true;
-      btn.textContent = '…';
-
-      const result = await sendAction(undoAction, screenName);
-      if (result.success) {
-        removeBlockedUser(screenName, action);
-        onUndo(action);
-        bar.remove();
-        showToast(msg(undoToastKey, screenName));
-      } else {
-        btn.disabled = false;
-        btn.textContent = undoLabel;
-      }
-    });
-
+    bar.className = 'twblock-hidden-bar' + (options.className ? ' ' + options.className : '');
+    bar.setAttribute('data-screen-name', screenName);
+    bar._twblockRestore = options.restore || null;
+    bar._twblockOptions = options;
+    renderStateBar(bar);
     return bar;
   }
 
-  function hideTweet(tweet, screenName, action) {
-    if (tweet.querySelector(':scope > .twblock-hidden-bar')) return;
-
-    const contentWrapper = tweet.querySelector(':scope > div');
-    if (!contentWrapper) return;
-    contentWrapper.style.display = 'none';
-
-    const bar = createHiddenBar(screenName, action, (act) => {
-      contentWrapper.style.display = '';
-      const twblockBtn = tweet.querySelector('.twblock-' + act + '.twblock-success');
-      if (twblockBtn) {
-        twblockBtn.classList.remove('twblock-success');
-        twblockBtn.innerHTML = getIcon(act);
-        twblockBtn._isActive = false;
-      }
-    });
-
-    tweet.insertBefore(bar, tweet.firstChild);
+  function closeStateBar(bar) {
+    if (bar._twblockRestore) {
+      try { bar._twblockRestore(); } catch (err) { /* noop */ }
+      bar._twblockRestore = null;
+    }
+    bar.remove();
   }
 
-  // ---- 引用ツイート非表示 ----
-  function hideQuotedTweet(quotedBlock, screenName, action) {
-    if (quotedBlock.querySelector('.twblock-hidden-bar')) return;
+  function renderStateBar(bar) {
+    const screenName = bar.getAttribute('data-screen-name');
+    const options = bar._twblockOptions || {};
+    const state = getUserState(screenName);
+    const action = primaryAction(state);
+    if (!action) { closeStateBar(bar); return; }
 
-    const hiddenChildren = [];
-    for (const child of quotedBlock.children) {
-      child.style.display = 'none';
-      hiddenChildren.push(child);
-    }
+    const undoAction = action === 'block' ? 'unblock' : 'unmute';
+    const statusLabel = action === 'block' ? msg('blockedStatus') : msg('mutedStatus');
+    const undoLabel = action === 'block' ? msg('unblockLabel') : msg('unmuteLabel');
+    const undoToastKey = action === 'block' ? 'toastUnblocked' : 'toastUnmuted';
 
-    const bar = createHiddenBar(screenName, action, (act) => {
-      hiddenChildren.forEach(child => { child.style.display = ''; });
-      const twblockBtn = quotedBlock.querySelector('.twblock-' + act + '.twblock-success');
-      if (twblockBtn) {
-        twblockBtn.classList.remove('twblock-success');
-        twblockBtn.innerHTML = getIcon(act);
-        twblockBtn._isActive = false;
+    bar.textContent = '';
+
+    const label = document.createElement('span');
+    label.className = 'twblock-hidden-label';
+    label.textContent = statusLabel + ' @' + screenName + (options.hint ? ' — ' + options.hint : '');
+    bar.appendChild(label);
+
+    const undoBtn = makeBarButton(undoLabel);
+    undoBtn.addEventListener('click', async (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      undoBtn.disabled = true;
+      undoBtn.textContent = '…';
+
+      const result = await sendAction(undoAction, screenName);
+      if (isUndoSettled(result)) {
+        setUserState(screenName, action, 0);
+        syncButtons(screenName);
+        showToast(result.success ? msg(undoToastKey, screenName) : msg('toastStateSynced', screenName));
+        refreshHiddenForUser(screenName);
+      } else {
+        undoBtn.disabled = false;
+        undoBtn.textContent = undoLabel;
+        showToast(errorMessage(result));
+        appendForceButton(bar, screenName);
       }
     });
+    bar.appendChild(undoBtn);
 
-    quotedBlock.insertBefore(bar, quotedBlock.firstChild);
+    // ミュート済みからブロックへ切り替え（ボタンの押し間違い救済）
+    if (action === 'mute' && showBlock) {
+      const upgradeBtn = makeBarButton(msg('switchToBlockLabel'), 'twblock-bar-danger');
+      upgradeBtn.addEventListener('click', async (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        upgradeBtn.disabled = true;
+        upgradeBtn.textContent = '…';
+
+        // 別の場所のバーが古いままだった場合など、すでにブロック済みなら投げ直さない
+        if (stateHas(getUserState(screenName), 'block')) {
+          refreshHiddenForUser(screenName);
+          return;
+        }
+
+        if (!(await confirmBlockIfFollowing(screenName))) {
+          upgradeBtn.disabled = false;
+          upgradeBtn.textContent = msg('switchToBlockLabel');
+          return;
+        }
+
+        const result = await sendAction('block', screenName);
+        if (result.success) {
+          setUserState(screenName, 'block', 1);
+          countStat('block');
+          syncButtons(screenName);
+          showToast(msg('toastBlocked', screenName));
+          refreshHiddenForUser(screenName);
+        } else {
+          upgradeBtn.disabled = false;
+          upgradeBtn.textContent = msg('switchToBlockLabel');
+          showToast(errorMessage(result));
+        }
+      });
+      bar.appendChild(upgradeBtn);
+    }
+
+    if (options.reload) {
+      const reloadBtn = makeBarButton(msg('reloadLabel'));
+      reloadBtn.addEventListener('click', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        window.location.reload();
+      });
+      bar.appendChild(reloadBtn);
+    }
+
+    if (options.dismissible) {
+      const closeBtn = makeBarButton('×', 'twblock-bar-close');
+      closeBtn.setAttribute('aria-label', msg('dismissLabel'));
+      closeBtn.title = msg('dismissLabel');
+      closeBtn.addEventListener('click', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        closeStateBar(bar);
+      });
+      bar.appendChild(closeBtn);
+    }
+  }
+
+  // API側で解除できないときの最後の逃げ道: ローカル記録だけを消して再表示する。
+  // ラベルどおり「とにかく出す」ので、block と mute の両方を落とす
+  function appendForceButton(bar, screenName) {
+    if (bar.querySelector('.twblock-bar-force')) return;
+    const forceBtn = makeBarButton(msg('forceShowLabel'), 'twblock-bar-force');
+    forceBtn.addEventListener('click', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      setUserState(screenName, 'block', 0);
+      setUserState(screenName, 'mute', 0);
+      syncButtons(screenName);
+      refreshHiddenForUser(screenName);
+    });
+    bar.appendChild(forceBtn);
+  }
+
+  // ---- 畳み/戻し ----
+  // 子を配列に控えるのではなく、呼ばれるたびに「いまの子」に対して貼り直す。
+  // 画像の遅延ロードで子が増えたり、Reactが中身を作り直したりしても追随できる。
+  function setChildrenHidden(el, hidden) {
+    for (const child of el.children) {
+      if (child.classList && child.classList.contains('twblock-hidden-bar')) continue;
+      child.style.display = hidden ? 'none' : '';
+    }
+  }
+
+  function hideElement(el, screenName) {
+    if (!primaryAction(getUserState(screenName))) return;
+    setChildrenHidden(el, true);
+    el.setAttribute(COLLAPSED_ATTR, '1');
+    if (el.querySelector(':scope > .twblock-hidden-bar')) return;
+
+    const bar = createStateBar(screenName, {
+      restore: () => {
+        setChildrenHidden(el, false);
+        el.removeAttribute(COLLAPSED_ATTR);
+      },
+    });
+    el.insertBefore(bar, el.firstChild);
+  }
+
+  function unhideElement(el) {
+    const bar = el.querySelector(':scope > .twblock-hidden-bar');
+    if (bar) { closeStateBar(bar); return; }
+    // 自分で畳んだものだけ戻す。そうしないと X が付けた inline style を消してしまう
+    if (!el.hasAttribute(COLLAPSED_ATTR)) return;
+    setChildrenHidden(el, false);
+    el.removeAttribute(COLLAPSED_ATTR);
+  }
+
+  function hideTweet(tweet, screenName) {
+    hideElement(tweet, screenName);
+  }
+
+  function unhideTweet(tweet) {
+    unhideElement(tweet);
+  }
+
+  function hideQuotedTweet(quotedBlock, screenName) {
+    hideElement(quotedBlock, screenName);
+  }
+
+  function unhideQuotedTweet(quotedBlock) {
+    unhideElement(quotedBlock);
+  }
+
+  // 画面に出ている同一ユーザーの投稿をまとめて隠す/戻し、バーの中身も作り直す。
+  // 同じ人の投稿は複数箇所に出るので、片方で状態を変えたらもう片方も追随させないと
+  // 「ミュート解除を押したのにブロック済みに変わる」ような食い違いが出る。
+  function refreshHiddenForUser(screenName) {
+    const key = nameKey(screenName);
+    const action = primaryAction(getUserState(key));
+    const onOwnProfile = isViewingProfileTimeline(key);
+
+    const articles = document.querySelectorAll(
+      'article[' + AUTHOR_ATTR + '="' + key + '"], article[' + RETWEETER_ATTR + '="' + key + '"]'
+    );
+    articles.forEach((tweet) => {
+      // タイムラインの仮想化で article が別のツイートに使い回されると属性が古くなる。
+      // 別人の投稿を畳まないよう、いま表示されている中身で確かめる
+      if (!articleStillBelongsTo(tweet, key)) {
+        tweet.removeAttribute(AUTHOR_ATTR);
+        tweet.removeAttribute(RETWEETER_ATTR);
+        return;
+      }
+      if (action && !onOwnProfile) hideTweet(tweet, screenName);
+      else unhideTweet(tweet);
+    });
+
+    document.querySelectorAll('[' + QUOTED_ATTR + '="' + key + '"]').forEach((block) => {
+      if (action && !onOwnProfile) hideQuotedTweet(block, screenName);
+      else unhideQuotedTweet(block);
+    });
+
+    refreshStateBars(key);
+  }
+
+  function articleStillBelongsTo(tweet, key) {
+    // 畳まれている間は本文が display:none なだけで中身は残っているので判定できる
+    const author = extractAuthorScreenName(tweet);
+    if (author && nameKey(author) === key) return true;
+    const rt = extractRetweetInfo(tweet);
+    return Boolean(rt && nameKey(rt.retweeter) === key);
+  }
+
+  // 同一ユーザーのバー（非表示バー・プロフィール通知バー）を現在の状態で描き直す
+  function refreshStateBars(screenName) {
+    const key = nameKey(screenName);
+    document.querySelectorAll('.twblock-hidden-bar[data-screen-name]').forEach((bar) => {
+      if (nameKey(bar.getAttribute('data-screen-name')) !== key) return;
+      renderStateBar(bar);
+    });
+  }
+
+  // ---- プロフィールでブロックした直後の通知バー ----
+  function showProfileNotice(screenName) {
+    document.querySelectorAll('.twblock-notice-bar').forEach((el) => el.remove());
+    const column = document.querySelector('[data-testid="primaryColumn"]');
+    const userName = column && column.querySelector('[data-testid="UserName"]');
+    const anchor = userName && userName.parentElement;
+    if (!anchor) return;
+
+    const bar = createStateBar(screenName, {
+      className: 'twblock-notice-bar',
+      hint: msg('profileStaleHint'),
+      reload: true,
+      dismissible: true,
+    });
+    bar.setAttribute('data-twblock-path', location.pathname);
+    anchor.appendChild(bar);
   }
 
   // ---- ボタン作成 ----
@@ -808,90 +1298,131 @@
     container.setAttribute('data-screen-name', screenName);
 
     if (showBlock) {
-      container.appendChild(createButton(screenName, 'block', msg('blockLabel'), tweet));
+      container.appendChild(createButton(screenName, 'block', tweet));
     }
     if (showMute) {
-      container.appendChild(createButton(screenName, 'mute', msg('muteLabel'), tweet));
+      container.appendChild(createButton(screenName, 'mute', tweet));
     }
 
     return container;
   }
 
-  function createButton(screenName, action, label, tweet) {
-    const btn = document.createElement('button');
-    btn.className = 'twblock-btn twblock-' + action;
-    btn.setAttribute('aria-label', label + ' @' + screenName);
-    btn.title = label + ' @' + screenName;
-    btn.innerHTML = getIcon(action);
+  function applyButtonState(btn, screenName, action, active) {
+    btn._isActive = active;
+    btn.classList.toggle('twblock-success', active);
+    if (!btn.classList.contains('twblock-loading')) {
+      btn.innerHTML = active ? CHECK_ICON : getIcon(action);
+    }
+    const label = active
+      ? (action === 'block' ? msg('blockedStatus') : msg('mutedStatus'))
+      : (action === 'block' ? msg('blockLabel') : msg('muteLabel'));
+    const text = label + ' @' + screenName;
+    btn.title = text;
+    btn.setAttribute('aria-label', text);
+    btn.setAttribute('aria-pressed', active ? 'true' : 'false');
+  }
 
-    btn._isActive = false;
+  // 指定ユーザーの全ボタンを現在の状態に合わせる
+  function syncButtons(screenName) {
+    const key = nameKey(screenName);
+    const state = blockedUsers.get(key);
+    document.querySelectorAll('.twblock-btn-container[data-screen-name]').forEach((container) => {
+      const name = container.getAttribute('data-screen-name');
+      if (nameKey(name) !== key) return;
+      syncContainer(container, name, state);
+    });
+  }
+
+  function syncContainer(container, screenName, state) {
+    const s = state !== undefined ? state : getUserState(screenName);
+    const blockBtn = container.querySelector('.twblock-block');
+    const muteBtn = container.querySelector('.twblock-mute');
+    if (blockBtn) applyButtonState(blockBtn, screenName, 'block', stateHas(s, 'block'));
+    if (muteBtn) applyButtonState(muteBtn, screenName, 'mute', stateHas(s, 'mute'));
+  }
+
+  async function confirmBlockIfFollowing(screenName) {
+    if (!confirmBlockFollowing) return true;
+    const followResult = await checkFollowing(screenName);
+    // 判定できなかったときに素通しすると、設定がレート制限中だけ黙って無効になる
+    if (followResult.unknown) return window.confirm(msg('confirmBlockUnknown', screenName));
+    if (!followResult.following) return true;
+    return window.confirm(msg('confirmBlockFollowing', screenName));
+  }
+
+  function createButton(screenName, action, tweet) {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'twblock-btn twblock-' + action;
+    applyButtonState(btn, screenName, action, false);
+
     const undoAction = action === 'block' ? 'unblock' : 'unmute';
 
     btn.addEventListener('click', async (e) => {
       e.preventDefault();
       e.stopPropagation();
-      if (btn.disabled) return;
+      // 確認ダイアログを出している間もクリックを受け付けないようにする
+      if (btn.disabled || btn._busy) return;
+      btn._busy = true;
+
+      const wasActive = Boolean(btn._isActive);
+      const currentAction = wasActive ? undoAction : action;
+
+      // フォロー中ユーザーのブロック確認（ローディング表示前に聞く）
+      if (action === 'block' && !wasActive) {
+        if (!(await confirmBlockIfFollowing(screenName))) {
+          btn._busy = false;
+          return;
+        }
+      }
 
       btn.disabled = true;
       btn.classList.add('twblock-loading');
 
-      const currentAction = btn._isActive ? undoAction : action;
-
-      // フォロー中ユーザーのブロック確認
-      if (confirmBlockFollowing && action === 'block' && !btn._isActive) {
-        const followResult = await checkFollowing(screenName);
-        if (followResult.following) {
-          btn.classList.remove('twblock-loading');
-          btn.disabled = false;
-          if (!confirm(msg('confirmBlockFollowing', screenName))) return;
-          btn.disabled = true;
-          btn.classList.add('twblock-loading');
-        }
-      }
-
       const result = await sendAction(currentAction, screenName);
+
       btn.classList.remove('twblock-loading');
+      btn.disabled = false;
+      btn._busy = false;
 
-      if (result.success) {
-        if (!btn._isActive) {
-          btn._isActive = true;
-          btn.classList.add('twblock-success');
-          btn.innerHTML = CHECK_ICON;
-          btn.title = (action === 'block' ? msg('blockedStatus') : msg('mutedStatus')) + ' @' + screenName;
-          btn.disabled = false;
-          addBlockedUser(screenName, action);
-          chrome.runtime.sendMessage({ type: 'ACTION_COMPLETED', action }).catch(() => {});
-          showToast(msg(action === 'block' ? 'toastBlocked' : 'toastMuted', screenName));
-
-          const btnContainer = btn.closest('.twblock-btn-container');
-          if (action === 'block' && btnContainer && btnContainer.classList.contains('twblock-profile')) {
-            setTimeout(() => window.location.reload(), 300);
-            return;
-          }
-
-          // 引用ツイート内のボタンなら引用部分にバー表示
-          if (btnContainer && btnContainer._quotedBlock) {
-            setTimeout(() => hideQuotedTweet(btnContainer._quotedBlock, screenName, action), 300);
-          } else {
-            const parentTweet = btn.closest('article[data-testid="tweet"]');
-            if (parentTweet) {
-              setTimeout(() => hideTweet(parentTweet, screenName, action), 300);
-            }
-          }
-        } else {
-          btn._isActive = false;
-          btn.classList.remove('twblock-success');
-          btn.innerHTML = getIcon(action);
-          btn.title = label + ' @' + screenName;
-          removeBlockedUser(screenName, action);
-          btn.disabled = false;
-        }
-      } else {
+      const settled = wasActive ? isUndoSettled(result) : result.success;
+      if (!settled) {
         btn.classList.add('twblock-error');
-        btn.title = result.message || msg('errorOccurred');
-        btn.disabled = false;
+        showToast(errorMessage(result));
         setTimeout(() => btn.classList.remove('twblock-error'), 3000);
+        syncButtons(screenName);
+        return;
       }
+
+      setUserState(screenName, action, wasActive ? 0 : 1);
+      syncButtons(screenName);
+
+      if (wasActive) {
+        showToast(result.success
+          ? msg(action === 'block' ? 'toastUnblocked' : 'toastUnmuted', screenName)
+          : msg('toastStateSynced', screenName));
+        refreshHiddenForUser(screenName);
+        return;
+      }
+
+      countStat(action);
+      showToast(msg(action === 'block' ? 'toastBlocked' : 'toastMuted', screenName));
+
+      const btnContainer = btn.closest('.twblock-btn-container');
+      if (action === 'block' && btnContainer && btnContainer.classList.contains('twblock-profile')) {
+        // プロフィールでは X 側の表示が古いままになる。強制リロードはせず、
+        // 何が起きたかと再読み込み手段を出す（設定でリロードに戻せる）。
+        if (reloadAfterProfileBlock) {
+          setTimeout(() => window.location.reload(), 300);
+          return;
+        }
+        showProfileNotice(screenName);
+        refreshHiddenForUser(screenName);
+        return;
+      }
+
+      // 該当ユーザーの投稿（引用RT含む）をまとめて畳む
+      setTimeout(() => refreshHiddenForUser(screenName), 300);
     });
 
     return btn;
@@ -952,9 +1483,16 @@
     return null;
   }
 
+  function hasOwnContainer(row) {
+    return Boolean(row.querySelector(':scope > .twblock-btn-container'));
+  }
+
+  function showAnyButton() {
+    return showBlock || showMute;
+  }
+
   // ---- ボタン挿入: タイムラインツイート ----
   function processTweets() {
-    const me = getMyScreenName();
     const tweets = document.querySelectorAll(
       'article[data-testid="tweet"]:not([' + PROCESSED + '])'
     );
@@ -965,83 +1503,95 @@
           !tweet.querySelector('[data-testid="caret"]')) return;
 
       try {
-        tweet.setAttribute(PROCESSED, '1');
-
         const rtInfo = extractRetweetInfo(tweet);
 
         // RT者のボタンを"reposted"行に挿入
-        if (rtInfo && rtInfo.retweeter !== me && rtInfo.scLinkParent) {
+        if (rtInfo && !isMe(rtInfo.retweeter) && rtInfo.scLinkParent && !hasOwnContainer(rtInfo.scLinkParent)) {
           const rtButtons = createButtons(rtInfo.retweeter, tweet);
           if (rtButtons) {
             rtButtons.classList.add('twblock-tweet');
             rtButtons.classList.add('twblock-repost');
             rtInfo.scLinkParent.classList.add('twblock-repost-row');
             rtInfo.scLinkParent.appendChild(rtButtons);
+            syncContainer(rtButtons, rtInfo.retweeter);
+            // RT者を対象に操作したときも、この記事を畳めるようにする
+            tweet.setAttribute(RETWEETER_ATTR, nameKey(rtInfo.retweeter));
           }
         }
 
-        // 元投稿者のボタンをgrok/caret行に挿入
         const authorName = extractAuthorScreenName(tweet) || extractScreenName(tweet);
-        if (!authorName || authorName === me) {
-          processQuotedTweet(tweet, me);
+        if (!authorName || isMe(authorName)) {
+          tweet.setAttribute(PROCESSED, '1');
+          processQuotedTweet(tweet);
           return;
         }
 
+        tweet.setAttribute(AUTHOR_ATTR, nameKey(authorName));
+
+        // 元投稿者のボタンをgrok/caret行に挿入
         const grokInfo = findGrokRow(tweet);
-        if (grokInfo) {
+        if (grokInfo && !hasOwnContainer(grokInfo.row)) {
           const { row, grokBtn } = grokInfo;
           const buttons = createButtons(authorName, tweet);
-          if (!buttons) return;
-          buttons.classList.add('twblock-tweet');
-          buttons.style.marginLeft = 'auto';
-          buttons.style.paddingLeft = '4px';
-          if (grokBtn) {
-            let grokChild = null;
+          if (buttons) {
+            buttons.classList.add('twblock-tweet');
+            buttons.style.marginLeft = 'auto';
+            buttons.style.paddingLeft = '4px';
+            let anchorChild = null;
+            const anchorNode = grokBtn || grokInfo.caret;
             for (const child of row.children) {
-              if (child.contains(grokBtn)) { grokChild = child; break; }
+              if (child.contains(anchorNode)) { anchorChild = child; break; }
             }
-            if (grokChild) {
-              row.insertBefore(buttons, grokChild);
-            } else {
+            if (anchorChild) {
+              row.insertBefore(buttons, anchorChild);
+            } else if (grokBtn) {
               row.insertBefore(buttons, row.firstChild);
-            }
-          } else {
-            // caretを含む子要素の直前に挿入（⋯の左側に配置）
-            let caretChild = null;
-            for (const child of row.children) {
-              if (child.contains(grokInfo.caret)) { caretChild = child; break; }
-            }
-            if (caretChild) {
-              row.insertBefore(buttons, caretChild);
             } else {
               row.appendChild(buttons);
             }
+            syncContainer(buttons, authorName);
           }
+        }
+
+        // アクションバーのレイアウトが未確定だと findGrokRow が null を返す。
+        // ここで処理済みにするとそのツイートだけ永久にボタンが出ないので、数回は次パスに回す。
+        const settled = Boolean(grokInfo) || !showAnyButton();
+        if (settled) {
+          tweet.setAttribute(PROCESSED, '1');
+          tweet.removeAttribute(RETRY_ATTR);
+        } else {
+          const tries = Number(tweet.getAttribute(RETRY_ATTR) || 0) + 1;
+          if (tries >= MAX_TWEET_RETRIES) tweet.setAttribute(PROCESSED, '1');
+          else tweet.setAttribute(RETRY_ATTR, String(tries));
         }
 
         // ブロック/ミュート済みユーザーのツイートを自動非表示
-        const blockedAction = blockedUsers.get(authorName);
-        if (blockedAction) {
-          const activeBtn = tweet.querySelector('.twblock-' + blockedAction + ':not(.twblock-success)');
-          if (activeBtn) {
-            activeBtn._isActive = true;
-            activeBtn.classList.add('twblock-success');
-            activeBtn.innerHTML = CHECK_ICON;
-          }
-          if (!isViewingProfileTimeline(authorName)) {
-            hideTweet(tweet, authorName, blockedAction);
-          }
+        const blockedAction = primaryAction(getUserState(authorName));
+        if (blockedAction && !isViewingProfileTimeline(authorName)) {
+          hideTweet(tweet, authorName, blockedAction);
         }
 
-        processQuotedTweet(tweet, me);
-      } catch (e) {
+        processQuotedTweet(tweet);
+      } catch (err) {
+        console.warn('[twblock] processTweets', err);
+        // 途中で失敗したら挿入済みのものを撤去して次パスでやり直す。
+        // 引用ツイート側に立てた印も落とさないと、そこだけ二度と処理されない。
+        // ただし毎回同じ所で落ちる相手には諦めて、出したり消したりを繰り返さない
+        const tries = Number(tweet.getAttribute(RETRY_ATTR) || 0) + 1;
+        tweet.querySelectorAll('.twblock-btn-container').forEach((node) => node.remove());
+        if (tries >= MAX_TWEET_RETRIES) {
+          tweet.setAttribute(PROCESSED, '1');
+          return;
+        }
+        tweet.setAttribute(RETRY_ATTR, String(tries));
         tweet.removeAttribute(PROCESSED);
+        tweet.querySelectorAll('[' + PROCESSED + ']').forEach((node) => node.removeAttribute(PROCESSED));
       }
     });
   }
 
   // ---- ボタン挿入: 引用ツイート ----
-  function processQuotedTweet(parentTweet, me) {
+  function processQuotedTweet(parentTweet) {
     const candidates = parentTweet.querySelectorAll(
       'div[role="link"], div[tabindex="0"]'
     );
@@ -1057,13 +1607,7 @@
       if (userName === parentUserName) return;
 
       const qtScreenName = extractScreenName(block);
-      if (!qtScreenName || qtScreenName === me) return;
-
-      block.setAttribute(PROCESSED, '1');
-
-      const buttons = createButtons(qtScreenName, null);
-      if (!buttons) return;
-      buttons._quotedBlock = block;
+      if (!qtScreenName || isMe(qtScreenName)) return;
 
       // User-Nameの親flex-rowを探してインラインに挿入
       let targetRow = null;
@@ -1079,61 +1623,83 @@
       }
       if (!targetRow) return;
 
-      // targetRow〜block間の祖先コンテナを広げて全幅にする
-      let ancestor = targetRow;
-      while (ancestor && ancestor !== block) {
-        ancestor.style.flexGrow = '1';
-        ancestor.style.minWidth = '0';
-        ancestor = ancestor.parentElement;
+      block.setAttribute(PROCESSED, '1');
+      block.setAttribute(QUOTED_ATTR, nameKey(qtScreenName));
+
+      if (!hasOwnContainer(targetRow)) {
+        const buttons = createButtons(qtScreenName, null);
+        if (buttons) {
+          buttons._quotedBlock = block;
+
+          // targetRow〜block間の祖先コンテナを広げて全幅にする
+          let ancestor = targetRow;
+          while (ancestor && ancestor !== block) {
+            ancestor.style.flexGrow = '1';
+            ancestor.style.minWidth = '0';
+            ancestor = ancestor.parentElement;
+          }
+
+          buttons.classList.add('twblock-tweet');
+          buttons.style.marginLeft = 'auto';
+          buttons.style.paddingLeft = '8px';
+          targetRow.appendChild(buttons);
+          syncContainer(buttons, qtScreenName);
+        }
       }
 
-      buttons.classList.add('twblock-tweet');
-      buttons.style.marginLeft = 'auto';
-      buttons.style.paddingLeft = '8px';
-      targetRow.appendChild(buttons);
-
       // ブロック/ミュート済みユーザーの引用ツイートを自動非表示
-      const blockedAction = blockedUsers.get(qtScreenName);
-      if (blockedAction) {
-        const activeBtn = buttons.querySelector('.twblock-' + blockedAction + ':not(.twblock-success)');
-        if (activeBtn) {
-          activeBtn._isActive = true;
-          activeBtn.classList.add('twblock-success');
-          activeBtn.innerHTML = CHECK_ICON;
-        }
-        if (!isViewingProfileTimeline(qtScreenName)) {
-          hideQuotedTweet(block, qtScreenName, blockedAction);
-        }
+      const blockedAction = primaryAction(getUserState(qtScreenName));
+      if (blockedAction && !isViewingProfileTimeline(qtScreenName)) {
+        hideQuotedTweet(block, qtScreenName, blockedAction);
       }
     });
   }
 
   // ---- ボタン挿入: 全Followボタン共通処理 ----
   function processFollowButtons() {
-    const me = getMyScreenName();
-
     const followBtns = document.querySelectorAll(
-      '[data-testid$="-follow"]:not([' + PROCESSED + ']), [data-testid$="-unfollow"]:not([' + PROCESSED + '])'
+      '[data-testid$="-follow"], [data-testid$="-unfollow"], [data-testid$="-unblock"]'
     );
 
     followBtns.forEach((btn) => {
-      if (btn.closest('article[data-testid="tweet"]')) return;
+      // data-testid は "<ユーザーID>-follow" 形式。値ごと印にしておくと、
+      // X が同じDOMノードを別ユーザーに使い回したときに作り直せる
+      const stamp = btn.getAttribute('data-testid') || '1';
+      if (btn.getAttribute(PROCESSED) === stamp) return;
 
-      btn.setAttribute(PROCESSED, '1');
+      if (btn.closest('article[data-testid="tweet"]')) {
+        btn.setAttribute(PROCESSED, stamp);
+        return;
+      }
 
       const hoverCard = btn.closest('[data-testid="HoverCard"]');
       const userCell = btn.closest('[data-testid="UserCell"]');
+      const listItem = btn.closest('[role="listitem"]');
       const placement = btn.closest('[data-testid="placementTracking"]');
-      const isProfile = placement && !userCell && !hoverCard;
+      // 一覧の行を「プロフィールのFollowボタン」と誤認すると、
+      // 行のユーザーではなくプロフィール主に対してブロックが飛ぶ。
+      // UserCell がまだ付いていない瞬間があっても取り違えないよう、条件を厚くする。
+      const isProfile = Boolean(
+        placement && !userCell && !hoverCard && !listItem && getProfileScreenName()
+      );
 
       let screenName;
       if (isProfile) {
         screenName = getProfileScreenName();
       } else {
-        const container = userCell || hoverCard || btn.parentElement;
+        const container = userCell || hoverCard || listItem || btn.parentElement;
         screenName = extractScreenName(container);
       }
-      if (!screenName || screenName === me) return;
+      if (!screenName) {
+        // 描画途中で名前が取れないことがあるので数回は再試行し、それ以上は打ち切る
+        const tries = Number(btn.getAttribute(RETRY_ATTR) || 0) + 1;
+        if (tries >= MAX_TWEET_RETRIES) btn.setAttribute(PROCESSED, stamp);
+        else btn.setAttribute(RETRY_ATTR, String(tries));
+        return;
+      }
+      btn.removeAttribute(RETRY_ATTR);
+      btn.setAttribute(PROCESSED, stamp);
+      if (isMe(screenName)) return;
 
       let targetRow = null;
       let startNode = isProfile ? placement.parentElement : btn.parentElement;
@@ -1146,63 +1712,67 @@
         }
         startNode = startNode.parentElement;
       }
-      if (!targetRow || targetRow.querySelector('.twblock-btn-container')) return;
+      if (!targetRow) {
+        btn.removeAttribute(PROCESSED);
+        return;
+      }
 
-      const cssClass = isProfile ? 'twblock-profile' : 'twblock-sidebar';
-      const buttons = createButtons(screenName, null);
-      if (!buttons) return;
-      buttons.classList.add(cssClass);
-
-      let followChild = isProfile ? placement : null;
+      // 挿入位置の基準になる targetRow の直接の子を求める
+      let followChild = null;
+      for (const child of targetRow.children) {
+        if (child.contains(btn)) { followChild = child; break; }
+      }
       if (!followChild) {
-        for (const child of targetRow.children) {
-          if (child.contains(btn)) { followChild = child; break; }
+        btn.removeAttribute(PROCESSED);
+        return;
+      }
+
+      // 重複防止: この「単位」の中のコンテナは1つに畳む。
+      // X は再レンダリングでFollowボタンのネスト段数を変えることがあり、
+      // 行単位のガードでは前回挿入分を見落として二重になる（Issue #14）。
+      const scope = isProfile ? document : (userCell || hoverCard || listItem || targetRow);
+      const selector = isProfile
+        ? '.twblock-btn-container.twblock-profile'
+        : '.twblock-btn-container';
+      let reuse = null;
+      scope.querySelectorAll(selector).forEach((existing) => {
+        if (!reuse && nameKey(existing.getAttribute('data-screen-name')) === nameKey(screenName)) {
+          reuse = existing;
+        } else {
+          existing.remove();
         }
-      }
-      if (!followChild) return;
+      });
 
-      if (isProfile) {
-        // プロフィールではFollowボタンをreparentするとReactが壊れるため
-        // twblockボタンのみをFollowの前に挿入する
+      let buttons = reuse;
+      if (!buttons) {
+        buttons = createButtons(screenName, null);
+        if (!buttons) return;
+      }
+      buttons.classList.remove('twblock-profile', 'twblock-sidebar', 'twblock-hovercard');
+      buttons.classList.add(isProfile ? 'twblock-profile' : 'twblock-sidebar');
+      if (hoverCard) buttons.classList.add('twblock-hovercard');
+
+      // React管理下のFollowボタンは動かさない（reparentするとReactのDOM差分が壊れる）
+      if (buttons.parentElement !== targetRow || buttons.nextElementSibling !== followChild) {
         targetRow.insertBefore(buttons, followChild);
-      } else {
-        // sidebar / UserCellではラッパーでまとめてgapで間隔を確保
-        const wrapper = document.createElement('div');
-        wrapper.className = 'twblock-follow-wrapper';
-        targetRow.insertBefore(wrapper, followChild);
-        wrapper.appendChild(buttons);
-        wrapper.appendChild(followChild);
       }
-    });
-  }
-
-  // ---- 設定変更のリアルタイム反映 ----
-  function applyButtonVisibility() {
-    document.querySelectorAll('.twblock-block').forEach(btn => {
-      btn.style.display = showBlock ? '' : 'none';
-    });
-    document.querySelectorAll('.twblock-mute').forEach(btn => {
-      btn.style.display = showMute ? '' : 'none';
-    });
-    document.querySelectorAll('.twblock-btn-container').forEach(container => {
-      const hasVisible = container.querySelector('.twblock-btn:not([style*="display: none"])');
-      container.style.display = hasVisible ? '' : 'none';
+      syncContainer(buttons, screenName);
     });
   }
 
   // ---- ボタン挿入: 検索候補(typeahead)のユーザー ----
   function processTypeahead() {
-    const me = getMyScreenName();
     const items = document.querySelectorAll(
       '[data-testid="typeaheadRecentSearchesItem"]:not([' + PROCESSED + ']), [data-testid="typeaheadResult"]:not([' + PROCESSED + '])'
     );
 
     items.forEach((item) => {
       if (!item.querySelector('img')) return; // ユーザー項目のみ（検索クエリは除外）
-      item.setAttribute(PROCESSED, '1');
 
       const screenName = extractScreenName(item);
-      if (!screenName || screenName === me) return;
+      if (!screenName) return;
+      item.setAttribute(PROCESSED, '1');
+      if (isMe(screenName)) return;
 
       // item > div > div(flex/row) > div(textArea) > div(flex/row): [名前] [Xボタン]
       const container = item.children[0]?.children[0];
@@ -1216,21 +1786,47 @@
       if (!buttons) return;
       buttons.classList.add('twblock-typeahead');
 
-      // Xボタン(最後の子)の前に挿入
+      // Xボタン(最後の子)の前に挿入 — insertBefore の基準は直接の子でなければならない
+      let anchorChild = null;
       const xBtn = row.querySelector('button');
       if (xBtn) {
-        row.insertBefore(buttons, xBtn);
+        for (const child of row.children) {
+          if (child === xBtn || child.contains(xBtn)) { anchorChild = child; break; }
+        }
+      }
+      if (anchorChild) {
+        row.insertBefore(buttons, anchorChild);
       } else {
         row.appendChild(buttons);
       }
+      syncContainer(buttons, screenName);
     });
+  }
+
+  // ---- 設定変更・状態変更時の作り直し ----
+  function rescanAll() {
+    document.querySelectorAll('.twblock-btn-container').forEach((el) => el.remove());
+    // 通知バーは畳みと無関係なので巻き添えにしない（再読み込み導線が消えてしまう）
+    document.querySelectorAll('.twblock-hidden-bar:not(.twblock-notice-bar)')
+      .forEach((bar) => closeStateBar(bar));
+    document.querySelectorAll('[' + PROCESSED + ']').forEach((el) => el.removeAttribute(PROCESSED));
+    document.querySelectorAll('[' + RETRY_ATTR + ']').forEach((el) => el.removeAttribute(RETRY_ATTR));
+    processAll();
   }
 
   // ---- メイン処理 ----
   function processAll() {
-    processTweets();
-    processFollowButtons();
-    processTypeahead();
+    try { processTweets(); } catch (err) { console.warn('[twblock] processTweets', err); }
+    try { processFollowButtons(); } catch (err) { console.warn('[twblock] processFollowButtons', err); }
+    try { processTypeahead(); } catch (err) { console.warn('[twblock] processTypeahead', err); }
+    try { reapplyCollapsed(); } catch (err) { console.warn('[twblock] reapplyCollapsed', err); }
+  }
+
+  // 畳んだ要素に後から子が足される（画像の遅延ロード等）と、その子だけ表示されてしまう
+  function reapplyCollapsed() {
+    document.querySelectorAll('[' + COLLAPSED_ATTR + ']').forEach((el) => {
+      setChildrenHidden(el, true);
+    });
   }
 
   let rafScheduled = false;
@@ -1253,18 +1849,26 @@
   function checkUrlChange() {
     if (location.href !== lastUrl) {
       lastUrl = location.href;
+      // 別のページへ移ったら、前のプロフィールで出した通知バーは持ち越さない
+      document.querySelectorAll('.twblock-notice-bar').forEach((el) => {
+        if (el.getAttribute('data-twblock-path') !== location.pathname) el.remove();
+      });
       setTimeout(processAll, 500);
+    }
+    // アカウント切替で「自分」が変わったら覚え直す
+    const navLink = document.querySelector('a[data-testid="AppTabBar_Profile_Link"]');
+    const href = navLink && navLink.getAttribute('href');
+    if (href && myScreenName && href.replace('/', '') !== myScreenName) {
+      myScreenName = null;
+      rescanAll();
     }
   }
 
-  // ---- chrome.storage.onChanged: 設定変更をリアルタイム反映 ----
-  chrome.storage.onChanged.addListener((changes) => {
+  // ---- ストレージ変更のリアルタイム反映 ----
+  store.onChanged((changes) => {
     if (changes.settings) {
-      const newSettings = changes.settings.newValue || {};
-      showBlock = newSettings.showBlock !== false;
-      showMute = newSettings.showMute !== false;
-      confirmBlockFollowing = newSettings.confirmBlockFollowing !== false;
-      applyButtonVisibility();
+      applySettings(changes.settings.newValue);
+      rescanAll();
     }
     if (changes.icons) {
       const newIcons = changes.icons.newValue || {};
@@ -1274,10 +1878,33 @@
       iconsExtracted = Boolean(BLOCK_ICON && MUTE_ICON);
       replaceAllButtonIcons();
     }
+    if (changes[STORAGE_KEY]) {
+      // 初回読み込みの応答待ち中に来た変更は、読み込み結果に上書きされてしまう。
+      // 読み込みが終わってから拾い直す
+      if (!initialLoadDone) return;
+      const next = changes[STORAGE_KEY].newValue || {};
+      const snapshot = JSON.stringify(next);
+      if (snapshot !== lastWrittenSnapshot) {
+        lastWrittenSnapshot = snapshot;
+        const merged = normalizeStateMap(next);
+        // まだ書けていないローカル変更は他タブの内容より優先する。
+        // ここで潰すと「ブロックした直後に投稿が戻る」ことになる
+        for (const key of pendingSaveKeys) {
+          const local = blockedUsers.get(key);
+          if (local) merged[key] = local;
+          else delete merged[key];
+        }
+        blockedUsers.clear();
+        for (const [key, state] of Object.entries(merged)) blockedUsers.set(key, state);
+        if (pendingSaveKeys.size) saveBlockedUsers();
+        rescanAll();
+      }
+    }
   });
 
   // ---- 初期化 ----
   async function init() {
+    injectCSS();
     cacheI18n();
     loadIconDebugFlag();
     installIconDebugHooks();

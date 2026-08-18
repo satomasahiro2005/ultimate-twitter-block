@@ -51,9 +51,33 @@
   "resetStats": { "message": "統計をリセット" },
 
   "sectionReset": { "message": "リセット" },
-  "resetHint": { "message": "統計・アイコン・設定をすべて初期状態に戻します" },
+  "resetHint": { "message": "統計・アイコン・設定・ブロック/ミュートのローカル記録をすべて初期状態に戻します" },
   "fullReset": { "message": "拡張機能を完全リセット" },
   "confirmReset": { "message": "すべてのデータ（統計・設定）をリセットしますか？" },
+
+  "switchToBlockLabel": { "message": "ブロックに切替" },
+  "forceShowLabel": { "message": "強制的に表示" },
+  "reloadLabel": { "message": "再読み込み" },
+  "dismissLabel": { "message": "閉じる" },
+  "profileStaleHint": { "message": "X側の表示は再読み込みするまで変わりません" },
+  "errorNoAuth": { "message": "認証情報が取得できません。ページを操作してから再試行してください。" },
+  "errorForbidden": { "message": "セッションが期限切れです。ページを再読み込みしてください。" },
+  "errorRateLimited": { "message": "レート制限に達しました。しばらく待ってから再試行してください。" },
+  "errorNetwork": { "message": "通信エラーが発生しました" },
+  "reloadAfterProfileBlockLabel": { "message": "プロフィールでブロックしたらページを再読み込みする" },
+  "toastStateSynced": {
+    "message": "@$USER$ の状態を同期しました",
+    "placeholders": { "user": { "content": "$1" } }
+  },
+  "errorHttp": {
+    "message": "リクエストが失敗しました (HTTP $CODE$)",
+    "placeholders": { "code": { "content": "$1" } }
+  },
+
+  "confirmBlockUnknown": {
+    "message": "@$USER$ をフォローしているか確認できませんでした。ブロックしますか？",
+    "placeholders": { "user": { "content": "$1" } }
+  },
 
   "supportLabel": { "message": "サポート" },
   "versionLabel": { "message": "バージョン" },

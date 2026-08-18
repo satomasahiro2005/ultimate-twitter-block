@@ -1,0 +1,44 @@
+name: CI
+
+on:
+  push:
+    branches: ['**']
+  pull_request:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      # build.js が中でやること:
+      #   - _locales 3言語のキー/プレースホルダ一致
+      #   - 全JSの構文チェック
+      #   - content.js の chrome.* が @twblock マーカー区間だけに閉じているか
+      #   - content.js と生成した userscript を DOMスタブ上で起動し、
+      #     init() が完走して processAll() が例外を出さないか
+      #   - manifest が参照するファイルが ZIP に全部入っているか
+      # 生 grep をここに置くと build.js 側の strip と食い違うので、判定は build.js に一本化する
+      - name: Build and verify
+        run: node build.js
+
+      # コミット済みの userscript が古いままだと、@updateURL 経由の利用者に
+      # 古いものが配られ続ける（.gitignore で見落としやすい）
+      - name: Committed userscript is up to date
+        run: git diff --exit-code -- userscripts/twitter-block.user.js
+
+      - name: Install Chrome for DOM tests
+        uses: browser-actions/setup-chrome@v1
+        id: chrome
+
+      - name: DOM regression tests
+        env:
+          CHROME_PATH: ${{ steps.chrome.outputs.chrome-path }}
+          REQUIRE_BROWSER: '1'   # ブラウザが用意できていないときに緑で素通りさせない
+        run: |
+          npm install --no-save puppeteer-core@24
+          node tests/dom.test.js
