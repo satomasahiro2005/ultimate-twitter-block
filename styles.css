@@ -289,6 +289,11 @@
 .twblock-hidden-bar {
   display: flex;
   align-items: center;
+  /* X の reset は自前のクラスにしか box-sizing を当てないので、こちらは
+     初期値の content-box のままになる。width:100% と padding が足し算になり、
+     cellInnerDiv のような伸び縮みしない親では右へ32pxはみ出して、
+     右端に寄せたボタンがツイートの外に出る */
+  box-sizing: border-box;
   /* 幅いっぱいに広げたので、center だと文字が真ん中に飛ぶ。本文と同じ左寄せ */
   justify-content: flex-start;
   flex-wrap: wrap;

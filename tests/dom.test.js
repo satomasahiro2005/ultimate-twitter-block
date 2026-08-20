@@ -834,6 +834,53 @@ function startServer() {
     });
     check('リポスト: 無関係な投稿は畳まれない', otherUntouched);
 
+    // ---------------------------------------------------------------
+    // 13. 引用ツイート: 畳んだバーが引用カードからはみ出さない
+    // ---------------------------------------------------------------
+    await page.evaluate(() => {
+      window.__apiReply = { success: true, body: { ok: 1 } };
+      window.reset();
+      history.replaceState({}, '', '/home');
+      document.getElementById('root').appendChild(window.buildQuotedTweet('sam', 'tina'));
+    });
+    await page.evaluate(() => new Promise((r) => setTimeout(r, 700)));
+    const quotedButtons = await page.evaluate(() => ({
+      onQuote: document.querySelectorAll('[data-twblock-quoted="tina"] .twblock-btn-container').length,
+      onOuter: document.querySelectorAll('article[data-twblock-author="sam"] > div > .twblock-btn-container').length,
+    }));
+    check('引用: 引用元にもボタンが出る',
+      quotedButtons.onQuote === 1, JSON.stringify(quotedButtons));
+
+    await page.evaluate(() => {
+      document.querySelector('[data-twblock-quoted="tina"] .twblock-mute').click();
+    });
+    await page.evaluate(() => new Promise((r) => setTimeout(r, 900)));
+    const quotedBar = await page.evaluate(() => {
+      const block = document.querySelector('[data-twblock-quoted="tina"]');
+      const bar = block && block.querySelector(':scope > .twblock-hidden-bar');
+      if (!bar) return { hasBar: false };
+      const br = block.getBoundingClientRect();
+      const r = bar.getBoundingClientRect();
+      const btns = [...bar.querySelectorAll('button')];
+      return {
+        hasBar: true,
+        boxSizing: getComputedStyle(bar).boxSizing,
+        overflowRight: Math.round(r.right - br.right),
+        buttonOverflow: Math.round(Math.max(...btns.map((b) => b.getBoundingClientRect().right)) - br.right),
+        outerIntact: !document.querySelector('article[data-twblock-author="sam"] > .twblock-hidden-bar'),
+      };
+    });
+    check('引用: 引用元をミュートすると引用カードだけ畳まれる',
+      quotedBar.hasBar === true && quotedBar.outerIntact === true, JSON.stringify(quotedBar));
+    // width:100% と padding が足し算になると、右に寄せたボタンがカードの外へ出る。
+    // 実ページでは 31px はみ出して、引用の枠を越えて本体の右端まで届いていた
+    check('引用: バーがカードからはみ出さない（box-sizing）',
+      quotedBar.overflowRight !== undefined && quotedBar.overflowRight <= 0,
+      `bar が ${quotedBar.overflowRight}px はみ出し / box-sizing=${quotedBar.boxSizing}`);
+    check('引用: ボタンがカードの内側に収まる',
+      quotedBar.buttonOverflow !== undefined && quotedBar.buttonOverflow <= 0,
+      `button が ${quotedBar.buttonOverflow}px はみ出し`);
+
 
   } finally {
     await browser.close();
