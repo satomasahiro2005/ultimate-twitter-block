@@ -164,10 +164,12 @@
 
   // ---- i18n（init時にキャッシュして、処理中は chrome.* を触らない） ----
   
+  const _M = {"en":{"extName":"Ultimate Twitter Block","extDescription":"Add one-click block & mute buttons to every tweet, retweet, quote tweet, and profile on Twitter/X. Native UI design.","blockLabel":"Block","muteLabel":"Mute","blockedStatus":"Blocked","mutedStatus":"Muted","unblockLabel":"Unblock","unmuteLabel":"Unmute","toastBlocked":"Blocked @$1","toastMuted":"Muted @$1","toastUnblocked":"Unblocked @$1","toastUnmuted":"Unmuted @$1","errorTimeout":"Timed out","errorOccurred":"An error occurred","popupDescription":"One-click block & mute from tweets and profiles","settingsLabel":"Settings","sectionButtons":"Button Display","showBlockButton":"Show block button","showMuteButton":"Show mute button","confirmBlockFollowingLabel":"Confirm before blocking followed users","confirmBlockFollowing":"You are following @$1. Block anyway?","sectionLanguage":"Language","languageFollowSite":"Follow Twitter","languageFollowBrowser":"Follow browser","sectionStats":"Statistics","statsBlockedLabel":"Blocked","statsMutedLabel":"Muted","resetStats":"Reset Statistics","sectionReset":"Reset","resetHint":"Reset everything (statistics, icons, settings, and the local block/mute history) to defaults","fullReset":"Full Reset Extension","confirmReset":"Reset all data (statistics and settings)?","switchToBlockLabel":"Switch to block","forceShowLabel":"Show anyway","reloadLabel":"Refresh view","errorNoAuth":"Could not read your session. Interact with the page and try again.","errorForbidden":"Your session expired. Reload the page.","errorRateLimited":"Rate limited. Wait a moment and try again.","errorNetwork":"Network error","reloadAfterProfileBlockLabel":"Reload the page after blocking from a profile","toastStateSynced":"Synced the state of @$1","errorHttp":"Request failed (HTTP $1)","confirmBlockUnknown":"Could not check whether you follow @$1. Block anyway?","supportLabel":"Support","versionLabel":"Version","supportTwitterLabel":"Twitter","supportGithubLabel":"GitHub"},"ja":{"extName":"Ultimate Twitter Block","extDescription":"Twitter/Xのタイムラインにワンクリックのブロック＆ミュートボタンを追加。ツイート・RT・引用RT・プロフィールに対応。","blockLabel":"ブロック","muteLabel":"ミュート","blockedStatus":"ブロック済み","mutedStatus":"ミュート済み","unblockLabel":"ブロック解除","unmuteLabel":"ミュート解除","toastBlocked":"@$1 をブロックしました","toastMuted":"@$1 をミュートしました","toastUnblocked":"@$1 のブロックを解除しました","toastUnmuted":"@$1 のミュートを解除しました","errorTimeout":"タイムアウトしました","errorOccurred":"エラーが発生しました","popupDescription":"ツイートやプロフィールに表示されるボタンでワンクリックブロック＆ミュート","settingsLabel":"設定","sectionButtons":"ボタン表示","showBlockButton":"ブロックボタンを表示","showMuteButton":"ミュートボタンを表示","confirmBlockFollowingLabel":"フォロー中のユーザーをブロックする前に確認する","confirmBlockFollowing":"@$1 はフォロー中です。ブロックしますか？","sectionLanguage":"表示言語","languageFollowSite":"Twitterに合わせる","languageFollowBrowser":"ブラウザに合わせる","sectionStats":"統計","statsBlockedLabel":"ブロック","statsMutedLabel":"ミュート","resetStats":"統計をリセット","sectionReset":"リセット","resetHint":"統計・アイコン・設定・ブロック/ミュートのローカル記録をすべて初期状態に戻します","fullReset":"拡張機能を完全リセット","confirmReset":"すべてのデータ（統計・設定）をリセットしますか？","switchToBlockLabel":"ブロックに切替","forceShowLabel":"強制的に表示","reloadLabel":"表示を更新","errorNoAuth":"認証情報が取得できません。ページを操作してから再試行してください。","errorForbidden":"セッションが期限切れです。ページを再読み込みしてください。","errorRateLimited":"レート制限に達しました。しばらく待ってから再試行してください。","errorNetwork":"通信エラーが発生しました","reloadAfterProfileBlockLabel":"プロフィールでブロックしたらページを再読み込みする","toastStateSynced":"@$1 の状態を同期しました","errorHttp":"リクエストが失敗しました (HTTP $1)","confirmBlockUnknown":"@$1 をフォローしているか確認できませんでした。ブロックしますか？","supportLabel":"サポート","versionLabel":"バージョン","supportTwitterLabel":"Twitter","supportGithubLabel":"GitHub"},"zh_CN":{"extName":"Ultimate Twitter Block","extDescription":"在 Twitter/X 上为每条推文、转发、引用推文和个人资料添加一键屏蔽与隐藏按钮。原生界面风格。","blockLabel":"屏蔽","muteLabel":"隐藏","blockedStatus":"已屏蔽","mutedStatus":"已隐藏","unblockLabel":"取消屏蔽","unmuteLabel":"取消隐藏","toastBlocked":"已屏蔽 @$1","toastMuted":"已隐藏 @$1","toastUnblocked":"已对 @$1 取消屏蔽","toastUnmuted":"已对 @$1 取消隐藏","errorTimeout":"请求超时","errorOccurred":"发生错误","popupDescription":"在推文和个人资料中一键屏蔽与隐藏","settingsLabel":"设置","sectionButtons":"按钮显示","showBlockButton":"显示屏蔽按钮","showMuteButton":"显示隐藏按钮","confirmBlockFollowingLabel":"屏蔽已关注用户前先确认","confirmBlockFollowing":"你已关注 @$1。仍要屏蔽吗？","sectionLanguage":"显示语言","languageFollowSite":"跟随 Twitter","languageFollowBrowser":"跟随浏览器","sectionStats":"统计","statsBlockedLabel":"屏蔽","statsMutedLabel":"隐藏","resetStats":"重置统计","sectionReset":"重置","resetHint":"将统计、图标、设置以及本地的屏蔽/隐藏记录全部恢复为默认值","fullReset":"完全重置扩展","confirmReset":"要重置所有数据（统计和设置）吗？","switchToBlockLabel":"切换为屏蔽","forceShowLabel":"强制显示","reloadLabel":"刷新显示","errorNoAuth":"无法获取登录信息。请先在页面上操作后重试。","errorForbidden":"会话已过期。请重新载入页面。","errorRateLimited":"已达到频率限制。请稍后再试。","errorNetwork":"网络错误","reloadAfterProfileBlockLabel":"在个人资料页屏蔽后重新载入页面","toastStateSynced":"已同步 @$1 的状态","errorHttp":"请求失败 (HTTP $1)","confirmBlockUnknown":"无法确认你是否关注 @$1。仍要屏蔽吗？","supportLabel":"支持","versionLabel":"版本","supportTwitterLabel":"Twitter","supportGithubLabel":"GitHub"}};
+  // 既定はブラウザの表示言語
   const _lang = (navigator.language || '').toLowerCase();
   const _L = _lang.indexOf('ja') === 0 ? 'ja' : (_lang.indexOf('zh') === 0 ? 'zh_CN' : 'en');
-  const _M = {"en":{"extName":"Ultimate Twitter Block","extDescription":"Add one-click block & mute buttons to every tweet, retweet, quote tweet, and profile on Twitter/X. Native UI design.","blockLabel":"Block","muteLabel":"Mute","blockedStatus":"Blocked","mutedStatus":"Muted","unblockLabel":"Unblock","unmuteLabel":"Unmute","toastBlocked":"Blocked @$1","toastMuted":"Muted @$1","toastUnblocked":"Unblocked @$1","toastUnmuted":"Unmuted @$1","errorTimeout":"Timed out","errorOccurred":"An error occurred","popupDescription":"One-click block & mute from tweets and profiles","settingsLabel":"Settings","sectionButtons":"Button Display","showBlockButton":"Show block button","showMuteButton":"Show mute button","confirmBlockFollowingLabel":"Confirm before blocking followed users","confirmBlockFollowing":"You are following @$1. Block anyway?","sectionStats":"Statistics","statsBlockedLabel":"Blocked","statsMutedLabel":"Muted","resetStats":"Reset Statistics","sectionReset":"Reset","resetHint":"Reset everything (statistics, icons, settings, and the local block/mute history) to defaults","fullReset":"Full Reset Extension","confirmReset":"Reset all data (statistics and settings)?","switchToBlockLabel":"Switch to block","forceShowLabel":"Show anyway","reloadLabel":"Reload","errorNoAuth":"Could not read your session. Interact with the page and try again.","errorForbidden":"Your session expired. Reload the page.","errorRateLimited":"Rate limited. Wait a moment and try again.","errorNetwork":"Network error","reloadAfterProfileBlockLabel":"Reload the page after blocking from a profile","toastStateSynced":"Synced the state of @$1","errorHttp":"Request failed (HTTP $1)","confirmBlockUnknown":"Could not check whether you follow @$1. Block anyway?","supportLabel":"Support","versionLabel":"Version","supportTwitterLabel":"Twitter","supportGithubLabel":"GitHub"},"ja":{"extName":"Ultimate Twitter Block","extDescription":"Twitter/Xのタイムラインにワンクリックのブロック＆ミュートボタンを追加。ツイート・RT・引用RT・プロフィールに対応。","blockLabel":"ブロック","muteLabel":"ミュート","blockedStatus":"ブロック済み","mutedStatus":"ミュート済み","unblockLabel":"ブロック解除","unmuteLabel":"ミュート解除","toastBlocked":"@$1 をブロックしました","toastMuted":"@$1 をミュートしました","toastUnblocked":"@$1 のブロックを解除しました","toastUnmuted":"@$1 のミュートを解除しました","errorTimeout":"タイムアウトしました","errorOccurred":"エラーが発生しました","popupDescription":"ツイートやプロフィールに表示されるボタンでワンクリックブロック＆ミュート","settingsLabel":"設定","sectionButtons":"ボタン表示","showBlockButton":"ブロックボタンを表示","showMuteButton":"ミュートボタンを表示","confirmBlockFollowingLabel":"フォロー中のユーザーをブロックする前に確認する","confirmBlockFollowing":"@$1 はフォロー中です。ブロックしますか？","sectionStats":"統計","statsBlockedLabel":"ブロック","statsMutedLabel":"ミュート","resetStats":"統計をリセット","sectionReset":"リセット","resetHint":"統計・アイコン・設定・ブロック/ミュートのローカル記録をすべて初期状態に戻します","fullReset":"拡張機能を完全リセット","confirmReset":"すべてのデータ（統計・設定）をリセットしますか？","switchToBlockLabel":"ブロックに切替","forceShowLabel":"強制的に表示","reloadLabel":"再読み込み","errorNoAuth":"認証情報が取得できません。ページを操作してから再試行してください。","errorForbidden":"セッションが期限切れです。ページを再読み込みしてください。","errorRateLimited":"レート制限に達しました。しばらく待ってから再試行してください。","errorNetwork":"通信エラーが発生しました","reloadAfterProfileBlockLabel":"プロフィールでブロックしたらページを再読み込みする","toastStateSynced":"@$1 の状態を同期しました","errorHttp":"リクエストが失敗しました (HTTP $1)","confirmBlockUnknown":"@$1 をフォローしているか確認できませんでした。ブロックしますか？","supportLabel":"サポート","versionLabel":"バージョン","supportTwitterLabel":"Twitter","supportGithubLabel":"GitHub"},"zh_CN":{"extName":"Ultimate Twitter Block","extDescription":"在 Twitter/X 上为每条推文、转发、引用推文和个人资料添加一键屏蔽与隐藏按钮。原生界面风格。","blockLabel":"屏蔽","muteLabel":"隐藏","blockedStatus":"已屏蔽","mutedStatus":"已隐藏","unblockLabel":"取消屏蔽","unmuteLabel":"取消隐藏","toastBlocked":"已屏蔽 @$1","toastMuted":"已隐藏 @$1","toastUnblocked":"已对 @$1 取消屏蔽","toastUnmuted":"已对 @$1 取消隐藏","errorTimeout":"请求超时","errorOccurred":"发生错误","popupDescription":"在推文和个人资料中一键屏蔽与隐藏","settingsLabel":"设置","sectionButtons":"按钮显示","showBlockButton":"显示屏蔽按钮","showMuteButton":"显示隐藏按钮","confirmBlockFollowingLabel":"屏蔽已关注用户前先确认","confirmBlockFollowing":"你已关注 @$1。仍要屏蔽吗？","sectionStats":"统计","statsBlockedLabel":"屏蔽","statsMutedLabel":"隐藏","resetStats":"重置统计","sectionReset":"重置","resetHint":"将统计、图标、设置以及本地的屏蔽/隐藏记录全部恢复为默认值","fullReset":"完全重置扩展","confirmReset":"要重置所有数据（统计和设置）吗？","switchToBlockLabel":"切换为屏蔽","forceShowLabel":"强制显示","reloadLabel":"重新载入","errorNoAuth":"无法获取登录信息。请先在页面上操作后重试。","errorForbidden":"会话已过期。请重新载入页面。","errorRateLimited":"已达到频率限制。请稍后再试。","errorNetwork":"网络错误","reloadAfterProfileBlockLabel":"在个人资料页屏蔽后重新载入页面","toastStateSynced":"已同步 @$1 的状态","errorHttp":"请求失败 (HTTP $1)","confirmBlockUnknown":"无法确认你是否关注 @$1。仍要屏蔽吗？","supportLabel":"支持","versionLabel":"版本","supportTwitterLabel":"Twitter","supportGithubLabel":"GitHub"}};
-  function _msg(key, subs) {
+
+  function _fallbackMsg(key, subs) {
     const table = _M[_L] || _M.en;
     let out = table[key];
     if (out == null) out = _M.en[key];
@@ -181,6 +183,29 @@
     return out;
   }
 
+  // 拡張版は messages.json を読みに行くが、こちらは埋め込み済みなので選ぶだけ
+  function fetchLocaleTable(locale) {
+    return Promise.resolve(_M[locale] || null);
+  }
+
+
+  // 「Xの表示言語に合わせる」を選んだときだけ、ここに表が入る
+  let localeTable = null;
+
+  function applySubstitutions(text, subs) {
+    if (!subs || !subs.length) return text;
+    return text.replace(/\$(\d)/g, (whole, digit) => {
+      const value = subs[Number(digit) - 1];
+      return value === undefined ? whole : value;
+    });
+  }
+
+  function _msg(key, subs) {
+    if (localeTable && localeTable[key] != null) {
+      return applySubstitutions(localeTable[key], subs);
+    }
+    return _fallbackMsg(key, subs);
+  }
 
   const i18n = {};
   // 拡張の更新直後は古いコンテンツスクリプトが残り、chrome.* が
@@ -197,6 +222,44 @@
     } catch (err) {
       return i18n[key] || key;
     }
+  }
+
+  // ---- 表示言語 ----
+  // 'x' = Xの表示言語に合わせる / 'browser' = ブラウザに任せる / それ以外は固定
+  const SUPPORTED_LOCALES = ['en', 'ja', 'zh_CN'];
+
+  function normalizeLocale(tag) {
+    const t = String(tag || '').toLowerCase();
+    if (t.indexOf('ja') === 0) return 'ja';
+    if (t.indexOf('zh') === 0) return 'zh_CN';
+    if (t.indexOf('en') === 0) return 'en';
+    return null;
+  }
+
+  // X の表示言語。<html lang> が本命で、取れなければ lang cookie
+  function getSiteLocale() {
+    const fromHtml = normalizeLocale(document.documentElement.lang);
+    if (fromHtml) return fromHtml;
+    const cookie = document.cookie.match(/(?:^|;\s*)lang=([^;]*)/);
+    return cookie ? normalizeLocale(decodeURIComponent(cookie[1])) : null;
+  }
+
+  function resolveLocale() {
+    if (language === 'browser') return null;
+    if (SUPPORTED_LOCALES.indexOf(language) !== -1) return language;
+    return getSiteLocale();
+  }
+
+  // 表を読み直して、表示中の文言も差し替える
+  let appliedLocale = '(初期)';
+  async function applyLocale(rerender) {
+    const locale = resolveLocale();
+    const key = locale || '(既定)';
+    if (key === appliedLocale) return;
+    appliedLocale = key;
+    localeTable = locale ? await fetchLocaleTable(locale) : null;
+    cacheI18n();
+    if (rerender) rescanAll();
   }
 
   const I18N_CACHE_KEYS = [
@@ -533,6 +596,7 @@
   let showMute = true;
   let confirmBlockFollowing = true;
   let reloadAfterProfileBlock = false;
+  let language = 'x';
 
   // ---- ブロック/ミュート状態の永続化 ----
   // 記録はアカウントで分けない（同じ相手はどのアカウントでも見たくない、という運用）。
@@ -675,6 +739,7 @@
     showMute = s.showMute !== false;
     confirmBlockFollowing = s.confirmBlockFollowing !== false;
     reloadAfterProfileBlock = s.reloadAfterProfileBlock === true;
+    language = typeof s.language === 'string' ? s.language : 'x';
   }
 
   // 既存ボタンのアイコンを一括差し替え
@@ -1372,9 +1437,11 @@
 
     const label = document.createElement('span');
     label.className = 'twblock-hidden-label';
-    label.textContent = statusLabel + ' @' + screenName;
+    // プロフィールの通知バーは、その人のページにいるので相手のIDを出さない
+    label.textContent = options.nameless ? statusLabel : statusLabel + ' @' + screenName;
     bar.appendChild(label);
 
+    if (options.undo !== false) {
     const undoBtn = makeBarButton(undoLabel);
     undoBtn.addEventListener('click', async (e) => {
       e.preventDefault();
@@ -1396,6 +1463,7 @@
       }
     });
     bar.appendChild(undoBtn);
+    }
 
     // ミュート済みからブロックへ切り替え（ボタンの押し間違い救済）
     if (action === 'mute' && showBlock) {
@@ -1570,6 +1638,9 @@
 
     const bar = createStateBar(screenName, {
       className: 'twblock-notice-bar',
+      // 解除はプロフィールのボタン自体が済み表示になっているので、ここには置かない
+      nameless: true,
+      undo: false,
       reload: true,
     });
     bar.setAttribute('data-twblock-path', location.pathname);
@@ -2157,7 +2228,8 @@
   store.onChanged((changes) => {
     if (changes.settings) {
       applySettings(changes.settings.newValue);
-      rescanAll();
+      // 言語が変わっていれば表を読み直してから作り直す
+      applyLocale(false).then(() => rescanAll());
     }
     if (changes.icons) {
       const newIcons = changes.icons.newValue || {};
@@ -2194,12 +2266,13 @@
   // ---- 初期化 ----
   async function init() {
     injectCSS();
-    cacheI18n();
     loadIconDebugFlag();
     installIconDebugHooks();
     injectPageScript();
     await loadStoredIcons();
     await loadSettings();
+    // 文言は設定を読んだ後に決める（Xの言語に合わせる設定があるため）
+    await applyLocale(false);
     await loadStoredAccentColor();
     await loadBlockedUsers();
     setTimeout(processAll, 300);

@@ -45,6 +45,10 @@
     "placeholders": { "user": { "content": "$1" } }
   },
 
+  "sectionLanguage": { "message": "表示言語" },
+  "languageFollowSite": { "message": "Twitterに合わせる" },
+  "languageFollowBrowser": { "message": "ブラウザに合わせる" },
+
   "sectionStats": { "message": "統計" },
   "statsBlockedLabel": { "message": "ブロック" },
   "statsMutedLabel": { "message": "ミュート" },
@@ -57,7 +61,7 @@
 
   "switchToBlockLabel": { "message": "ブロックに切替" },
   "forceShowLabel": { "message": "強制的に表示" },
-  "reloadLabel": { "message": "再読み込み" },
+  "reloadLabel": { "message": "表示を更新" },
   "errorNoAuth": { "message": "認証情報が取得できません。ページを操作してから再試行してください。" },
   "errorForbidden": { "message": "セッションが期限切れです。ページを再読み込みしてください。" },
   "errorRateLimited": { "message": "レート制限に達しました。しばらく待ってから再試行してください。" },

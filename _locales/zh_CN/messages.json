@@ -45,6 +45,10 @@
     "placeholders": { "user": { "content": "$1" } }
   },
 
+  "sectionLanguage": { "message": "显示语言" },
+  "languageFollowSite": { "message": "跟随 Twitter" },
+  "languageFollowBrowser": { "message": "跟随浏览器" },
+
   "sectionStats": { "message": "统计" },
   "statsBlockedLabel": { "message": "屏蔽" },
   "statsMutedLabel": { "message": "隐藏" },
@@ -57,7 +61,7 @@
 
   "switchToBlockLabel": { "message": "切换为屏蔽" },
   "forceShowLabel": { "message": "强制显示" },
-  "reloadLabel": { "message": "重新载入" },
+  "reloadLabel": { "message": "刷新显示" },
   "errorNoAuth": { "message": "无法获取登录信息。请先在页面上操作后重试。" },
   "errorForbidden": { "message": "会话已过期。请重新载入页面。" },
   "errorRateLimited": { "message": "已达到频率限制。请稍后再试。" },

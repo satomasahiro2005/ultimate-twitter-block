@@ -424,12 +424,12 @@ function startServer() {
         stillOnProfile: location.pathname === '/frank',
       };
     });
-    check('プロフィール: 通知バーに相手のIDが出る',
-      Boolean(profileAfter.label && profileAfter.label.includes('@frank')), profileAfter.label);
+    check('プロフィール: 通知バーに相手のIDは出さない（本人のページなので）',
+      Boolean(profileAfter.label) && !profileAfter.label.includes('@'), profileAfter.label);
     check('要望: プロフィールのブロックでリロードしない', reloaded === false && profileAfter.stillOnProfile);
     check('要望: 代わりに通知バーが出る', profileAfter.hasNotice);
-    check('要望: 通知バーに解除と再読み込みがある',
-      profileAfter.buttons.length === 2, JSON.stringify(profileAfter.buttons));
+    check('要望: 通知バーはリロードだけ（解除はプロフィールのボタン側にある）',
+      profileAfter.buttons.length === 1, JSON.stringify(profileAfter.buttons));
 
     // ミュートでは通知バーを出さない（X側の表示が変わらないので出す意味がない）
     await page.evaluate(() => {
@@ -665,6 +665,62 @@ function startServer() {
       dialogs.length === 1, JSON.stringify(dialogs));
 
     await page.evaluate(() => { window.__followReply = { relationship: { source: { following: false } } }; });
+
+    // ---------------------------------------------------------------
+    // 11b. 表示言語の設定
+    // ---------------------------------------------------------------
+    async function labelWith(settings, htmlLang) {
+      await page.evaluate((s, lang) => {
+        document.documentElement.lang = lang;
+        localStorage.setItem('twblock_settings', JSON.stringify(s));
+        window.dispatchEvent(new StorageEvent('storage', {
+          key: 'twblock_settings', newValue: JSON.stringify(s),
+        }));
+      }, settings, htmlLang);
+      await page.evaluate(() => new Promise((r) => setTimeout(r, 700)));
+      await page.evaluate(() => {
+        window.reset();
+        history.replaceState({}, '', '/home');
+        document.getElementById('root').appendChild(window.buildTweet('lang_probe'));
+      });
+      await page.evaluate(() => new Promise((r) => setTimeout(r, 600)));
+      return page.evaluate(() => {
+        const btn = document.querySelector('article[data-twblock-author="lang_probe"] .twblock-block');
+        return btn ? btn.getAttribute('aria-label') : null;
+      });
+    }
+
+    const base = { showBlock: true, showMute: true, confirmBlockFollowing: false };
+    const jaFixed = await labelWith(Object.assign({}, base, { language: 'ja' }), 'en');
+    check('言語: 日本語を指定するとXが英語でも日本語になる',
+      Boolean(jaFixed && jaFixed.indexOf('ブロック') === 0), jaFixed);
+
+    const enFixed = await labelWith(Object.assign({}, base, { language: 'en' }), 'ja');
+    check('言語: Englishを指定するとXが日本語でも英語になる',
+      Boolean(enFixed && enFixed.indexOf('Block') === 0), enFixed);
+
+    const followSiteEn = await labelWith(Object.assign({}, base, { language: 'x' }), 'en');
+    check('言語: Xに合わせる → Xが英語なら英語',
+      Boolean(followSiteEn && followSiteEn.indexOf('Block') === 0), followSiteEn);
+
+    const followSiteJa = await labelWith(Object.assign({}, base, { language: 'x' }), 'ja');
+    check('言語: Xに合わせる → Xが日本語なら日本語',
+      Boolean(followSiteJa && followSiteJa.indexOf('ブロック') === 0), followSiteJa);
+
+    // ブラウザに合わせる = X の言語が変わっても文言が動かないこと
+    const browserOnJa = await labelWith(Object.assign({}, base, { language: 'browser' }), 'ja');
+    const browserOnEn = await labelWith(Object.assign({}, base, { language: 'browser' }), 'en');
+    check('言語: ブラウザに合わせる → Xの言語が変わっても文言が動かない',
+      Boolean(browserOnJa) && browserOnJa === browserOnEn,
+      `X=ja:[${browserOnJa}] X=en:[${browserOnEn}]`);
+
+    await page.evaluate(() => {
+      document.documentElement.lang = 'en';
+      const s = { showBlock: true, showMute: true, confirmBlockFollowing: true, language: 'en' };
+      localStorage.setItem('twblock_settings', JSON.stringify(s));
+      window.dispatchEvent(new StorageEvent('storage', { key: 'twblock_settings', newValue: JSON.stringify(s) }));
+    });
+    await page.evaluate(() => new Promise((r) => setTimeout(r, 700)));
 
     // ---------------------------------------------------------------
     // 12. リポスト行のボタンで押したときも投稿が畳まれる

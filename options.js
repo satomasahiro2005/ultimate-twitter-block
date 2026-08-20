@@ -1,20 +1,50 @@
 document.addEventListener('DOMContentLoaded', () => {
-  // i18n
-  document.querySelectorAll('[data-i18n]').forEach(el => {
-    el.textContent = chrome.i18n.getMessage(el.dataset.i18n);
-  });
+  // i18n。既定はブラウザの表示言語（chrome.i18n）
+  let localeTable = null;
+
+  function translate() {
+    document.querySelectorAll('[data-i18n]').forEach(el => {
+      const key = el.dataset.i18n;
+      el.textContent = (localeTable && localeTable[key] != null)
+        ? localeTable[key]
+        : chrome.i18n.getMessage(key);
+    });
+  }
+
+  // 「Xに合わせる」は設定画面からは判定できないので、ブラウザの言語のままにする
+  function applyOptionsLocale(language) {
+    if (language !== 'ja' && language !== 'en' && language !== 'zh_CN') {
+      if (!localeTable) return;
+      localeTable = null;
+      translate();
+      return;
+    }
+    fetch(chrome.runtime.getURL('_locales/' + language + '/messages.json'))
+      .then(res => res.json())
+      .then(json => {
+        const table = {};
+        for (const [key, entry] of Object.entries(json)) table[key] = entry.message;
+        localeTable = table;
+        translate();
+      })
+      .catch(() => {});
+  }
+
+  translate();
 
   const DEFAULT_SETTINGS = {
     showBlock: true,
     showMute: true,
     confirmBlockFollowing: true,
     reloadAfterProfileBlock: false,
+    language: 'x',
   };
 
   const showBlockEl = document.getElementById('show-block');
   const showMuteEl = document.getElementById('show-mute');
   const confirmBlockFollowingEl = document.getElementById('confirm-block-following');
   const reloadAfterProfileBlockEl = document.getElementById('reload-after-profile-block');
+  const languageEl = document.getElementById('language');
   const resetStatsBtn = document.getElementById('reset-stats');
   const statBlockedEl = document.getElementById('stat-blocked');
   const statMutedEl = document.getElementById('stat-muted');
@@ -30,6 +60,8 @@ document.addEventListener('DOMContentLoaded', () => {
     showMuteEl.checked = s.showMute !== false;
     confirmBlockFollowingEl.checked = s.confirmBlockFollowing !== false;
     reloadAfterProfileBlockEl.checked = s.reloadAfterProfileBlock === true;
+    languageEl.value = s.language || 'x';
+    applyOptionsLocale(s.language || 'x');
   }
 
   function renderStats(stats) {
@@ -52,11 +84,12 @@ document.addEventListener('DOMContentLoaded', () => {
         showMute: showMuteEl.checked,
         confirmBlockFollowing: confirmBlockFollowingEl.checked,
         reloadAfterProfileBlock: reloadAfterProfileBlockEl.checked,
+        language: languageEl.value,
       },
     });
   }
 
-  [showBlockEl, showMuteEl, confirmBlockFollowingEl, reloadAfterProfileBlockEl]
+  [showBlockEl, showMuteEl, confirmBlockFollowingEl, reloadAfterProfileBlockEl, languageEl]
     .forEach(el => el.addEventListener('change', saveSettings));
 
   // 統計リセット

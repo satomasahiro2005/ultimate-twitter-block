@@ -113,8 +113,48 @@
 
   // ---- i18n（init時にキャッシュして、処理中は chrome.* を触らない） ----
   /* @twblock:i18n-start */
-  const _msg = chrome.i18n.getMessage.bind(chrome.i18n);
+  // 既定の文言解決。拡張版は chrome.i18n（＝ブラウザの表示言語）を使う
+  const _fallbackMsg = chrome.i18n.getMessage.bind(chrome.i18n);
+
+  // 指定した言語の messages.json を読んで、キー→文字列の平坦な表にする。
+  // $USER$ のようなプレースホルダは $1 に畳んでおく
+  function fetchLocaleTable(locale) {
+    return fetch(chrome.runtime.getURL('_locales/' + locale + '/messages.json'))
+      .then((res) => res.json())
+      .then((json) => {
+        const table = {};
+        for (const [key, entry] of Object.entries(json)) {
+          let text = entry.message;
+          if (entry.placeholders) {
+            for (const [name, ph] of Object.entries(entry.placeholders)) {
+              text = text.replace(new RegExp('\\$' + name + '\\$', 'gi'), ph.content);
+            }
+          }
+          table[key] = text;
+        }
+        return table;
+      })
+      .catch(() => null);
+  }
   /* @twblock:i18n-end */
+
+  // 「Xの表示言語に合わせる」を選んだときだけ、ここに表が入る
+  let localeTable = null;
+
+  function applySubstitutions(text, subs) {
+    if (!subs || !subs.length) return text;
+    return text.replace(/\$(\d)/g, (whole, digit) => {
+      const value = subs[Number(digit) - 1];
+      return value === undefined ? whole : value;
+    });
+  }
+
+  function _msg(key, subs) {
+    if (localeTable && localeTable[key] != null) {
+      return applySubstitutions(localeTable[key], subs);
+    }
+    return _fallbackMsg(key, subs);
+  }
 
   const i18n = {};
   // 拡張の更新直後は古いコンテンツスクリプトが残り、chrome.* が
@@ -131,6 +171,44 @@
     } catch (err) {
       return i18n[key] || key;
     }
+  }
+
+  // ---- 表示言語 ----
+  // 'x' = Xの表示言語に合わせる / 'browser' = ブラウザに任せる / それ以外は固定
+  const SUPPORTED_LOCALES = ['en', 'ja', 'zh_CN'];
+
+  function normalizeLocale(tag) {
+    const t = String(tag || '').toLowerCase();
+    if (t.indexOf('ja') === 0) return 'ja';
+    if (t.indexOf('zh') === 0) return 'zh_CN';
+    if (t.indexOf('en') === 0) return 'en';
+    return null;
+  }
+
+  // X の表示言語。<html lang> が本命で、取れなければ lang cookie
+  function getSiteLocale() {
+    const fromHtml = normalizeLocale(document.documentElement.lang);
+    if (fromHtml) return fromHtml;
+    const cookie = document.cookie.match(/(?:^|;\s*)lang=([^;]*)/);
+    return cookie ? normalizeLocale(decodeURIComponent(cookie[1])) : null;
+  }
+
+  function resolveLocale() {
+    if (language === 'browser') return null;
+    if (SUPPORTED_LOCALES.indexOf(language) !== -1) return language;
+    return getSiteLocale();
+  }
+
+  // 表を読み直して、表示中の文言も差し替える
+  let appliedLocale = '(初期)';
+  async function applyLocale(rerender) {
+    const locale = resolveLocale();
+    const key = locale || '(既定)';
+    if (key === appliedLocale) return;
+    appliedLocale = key;
+    localeTable = locale ? await fetchLocaleTable(locale) : null;
+    cacheI18n();
+    if (rerender) rescanAll();
   }
 
   const I18N_CACHE_KEYS = [
@@ -462,6 +540,7 @@
   let showMute = true;
   let confirmBlockFollowing = true;
   let reloadAfterProfileBlock = false;
+  let language = 'x';
 
   // ---- ブロック/ミュート状態の永続化 ----
   // 記録はアカウントで分けない（同じ相手はどのアカウントでも見たくない、という運用）。
@@ -604,6 +683,7 @@
     showMute = s.showMute !== false;
     confirmBlockFollowing = s.confirmBlockFollowing !== false;
     reloadAfterProfileBlock = s.reloadAfterProfileBlock === true;
+    language = typeof s.language === 'string' ? s.language : 'x';
   }
 
   // 既存ボタンのアイコンを一括差し替え
@@ -1072,9 +1152,11 @@
 
     const label = document.createElement('span');
     label.className = 'twblock-hidden-label';
-    label.textContent = statusLabel + ' @' + screenName;
+    // プロフィールの通知バーは、その人のページにいるので相手のIDを出さない
+    label.textContent = options.nameless ? statusLabel : statusLabel + ' @' + screenName;
     bar.appendChild(label);
 
+    if (options.undo !== false) {
     const undoBtn = makeBarButton(undoLabel);
     undoBtn.addEventListener('click', async (e) => {
       e.preventDefault();
@@ -1096,6 +1178,7 @@
       }
     });
     bar.appendChild(undoBtn);
+    }
 
     // ミュート済みからブロックへ切り替え（ボタンの押し間違い救済）
     if (action === 'mute' && showBlock) {
@@ -1270,6 +1353,9 @@
 
     const bar = createStateBar(screenName, {
       className: 'twblock-notice-bar',
+      // 解除はプロフィールのボタン自体が済み表示になっているので、ここには置かない
+      nameless: true,
+      undo: false,
       reload: true,
     });
     bar.setAttribute('data-twblock-path', location.pathname);
@@ -1857,7 +1943,8 @@
   store.onChanged((changes) => {
     if (changes.settings) {
       applySettings(changes.settings.newValue);
-      rescanAll();
+      // 言語が変わっていれば表を読み直してから作り直す
+      applyLocale(false).then(() => rescanAll());
     }
     if (changes.icons) {
       const newIcons = changes.icons.newValue || {};
@@ -1894,12 +1981,13 @@
   // ---- 初期化 ----
   async function init() {
     injectCSS();
-    cacheI18n();
     loadIconDebugFlag();
     installIconDebugHooks();
     injectPageScript();
     await loadStoredIcons();
     await loadSettings();
+    // 文言は設定を読んだ後に決める（Xの言語に合わせる設定があるため）
+    await applyLocale(false);
     await loadStoredAccentColor();
     await loadBlockedUsers();
     setTimeout(processAll, 300);

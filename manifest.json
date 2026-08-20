@@ -34,7 +34,7 @@
   ],
   "web_accessible_resources": [
     {
-      "resources": ["pageScript.js"],
+      "resources": ["pageScript.js", "_locales/*/messages.json"],
       "matches": [
         "https://x.com/*",
         "https://twitter.com/*"

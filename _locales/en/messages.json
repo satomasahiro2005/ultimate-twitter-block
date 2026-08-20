@@ -45,6 +45,10 @@
     "placeholders": { "user": { "content": "$1" } }
   },
 
+  "sectionLanguage": { "message": "Language" },
+  "languageFollowSite": { "message": "Follow Twitter" },
+  "languageFollowBrowser": { "message": "Follow browser" },
+
   "sectionStats": { "message": "Statistics" },
   "statsBlockedLabel": { "message": "Blocked" },
   "statsMutedLabel": { "message": "Muted" },
@@ -57,7 +61,7 @@
 
   "switchToBlockLabel": { "message": "Switch to block" },
   "forceShowLabel": { "message": "Show anyway" },
-  "reloadLabel": { "message": "Reload" },
+  "reloadLabel": { "message": "Refresh view" },
   "errorNoAuth": { "message": "Could not read your session. Interact with the page and try again." },
   "errorForbidden": { "message": "Your session expired. Reload the page." },
   "errorRateLimited": { "message": "Rate limited. Wait a moment and try again." },

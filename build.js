@@ -203,6 +203,21 @@ function buildZip() {
   console.log(`ZIP: ${outName} (${files.length} files, ${zipBuffer.length} bytes)`);
 }
 
+function escapeForRegExp(text) {
+  return text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+// リポジトリ内のファイルを相対パスで列挙する（node_modules と .git は除く）
+function walkFiles(dir, rel, visit) {
+  for (const name of fs.readdirSync(dir)) {
+    if (name === 'node_modules' || name === '.git') continue;
+    const full = path.join(dir, name);
+    const r = rel ? rel + '/' + name : name;
+    if (fs.statSync(full).isDirectory()) walkFiles(full, r, visit);
+    else visit(r);
+  }
+}
+
 // manifest.json が名指ししているファイルを列挙する
 function manifestReferences() {
   const manifest = JSON.parse(readFile('manifest.json'));
@@ -214,7 +229,15 @@ function manifestReferences() {
     (cs.css || []).forEach(add);
   }
   for (const war of manifest.web_accessible_resources || []) {
-    (war.resources || []).forEach(add);
+    // resources は "_locales/*/messages.json" のようなパターンを取れるので展開する
+    (war.resources || []).forEach((pattern) => {
+      if (typeof pattern !== 'string') return;
+      if (pattern.indexOf('*') === -1) { add(pattern); return; }
+      const re = new RegExp('^' + pattern.split('*').map(escapeForRegExp).join('[^/]*') + '$');
+      let matched = 0;
+      walkFiles(ROOT, '', (rel) => { if (re.test(rel)) { add(rel); matched++; } });
+      if (!matched) fail(`manifest pattern matches no file: ${pattern}`);
+    });
   }
   if (manifest.background && manifest.background.service_worker) add(manifest.background.service_worker);
   if (manifest.action) {
@@ -451,10 +474,12 @@ function storeImpl() {
 
 function i18nImpl(table) {
   return `
+  const _M = ${JSON.stringify(table)};
+  // 既定はブラウザの表示言語
   const _lang = (navigator.language || '').toLowerCase();
   const _L = _lang.indexOf('ja') === 0 ? 'ja' : (_lang.indexOf('zh') === 0 ? 'zh_CN' : 'en');
-  const _M = ${JSON.stringify(table)};
-  function _msg(key, subs) {
+
+  function _fallbackMsg(key, subs) {
     const table = _M[_L] || _M.en;
     let out = table[key];
     if (out == null) out = _M.en[key];
@@ -466,6 +491,11 @@ function i18nImpl(table) {
       });
     }
     return out;
+  }
+
+  // 拡張版は messages.json を読みに行くが、こちらは埋め込み済みなので選ぶだけ
+  function fetchLocaleTable(locale) {
+    return Promise.resolve(_M[locale] || null);
   }
 `;
 }
