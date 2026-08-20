@@ -142,6 +142,7 @@ window.buildProfile = function (screenName) {
 
   const actionRow = document.createElement('div');
   actionRow.className = 'row';
+  actionRow.setAttribute('data-twblock-action-row', '1');
   const more = document.createElement('button');
   more.setAttribute('data-testid', 'userActions');
   more.textContent = '⋯';
@@ -171,6 +172,21 @@ window.buildProfile = function (screenName) {
 
   wrap.appendChild(header);
   return wrap;
+};
+
+// X がプロフィールの操作行に後からボタンを足す（サブスク等）のを再現する
+window.addLateProfileButton = function () {
+  const row = document.querySelector('[data-twblock-action-row]');
+  const placement = row.querySelector('[data-testid="placementTracking"]');
+  const late = document.createElement('div');
+  late.className = 'col';
+  late.setAttribute('data-testid', 'lateGiftButton');
+  const b = document.createElement('button');
+  b.textContent = 'gift';
+  late.appendChild(b);
+  // React は自分の次の兄弟の前に挿す。こちらのコンテナはその間にいる
+  row.insertBefore(late, placement);
+  return true;
 };
 
 window.reset = function () {

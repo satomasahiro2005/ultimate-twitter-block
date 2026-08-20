@@ -382,6 +382,33 @@ function startServer() {
       document.querySelectorAll('.twblock-btn-container.twblock-profile').length);
     check('プロフィール: ボタンが1つ出る', profileHasButtons === 1, `got ${profileHasButtons}`);
 
+    // X が後からボタンを足しても「X のボタン群 → こちら → Follow」の並びが崩れないこと。
+    // Followの直前に挿しているだけだと、後から生えたものがこちらとFollowの間に割り込む
+    const beforeLate = await page.evaluate(() => {
+      const cont = document.querySelector('.twblock-btn-container.twblock-profile');
+      const row = cont.parentElement;
+      return [...row.children].map((c) => ({ el: c, x: c.getBoundingClientRect().left }))
+        .sort((a, b) => a.x - b.x)
+        .map((o) => o.el.getAttribute('data-testid')
+          || (String(o.el.className).includes('twblock') ? 'OURS' : '?')).join(' ');
+    });
+    await page.evaluate(() => window.addLateProfileButton());
+    await page.evaluate(() => new Promise((r) => setTimeout(r, 400)));
+    const afterLate = await page.evaluate(() => {
+      const cont = document.querySelector('.twblock-btn-container.twblock-profile');
+      const row = cont.parentElement;
+      const visual = [...row.children].map((c) => ({ el: c, x: c.getBoundingClientRect().left }))
+        .sort((a, b) => a.x - b.x)
+        .map((o) => o.el.getAttribute('data-testid')
+          || (String(o.el.className).includes('twblock') ? 'OURS' : '?')).join(' ');
+      const dom = [...row.children].map((c) => c.getAttribute('data-testid')
+        || (String(c.className).includes('twblock') ? 'OURS' : '?')).join(' ');
+      return { visual, dom };
+    });
+    check('プロフィール: 後から足されたボタンが割り込んでも並びが変わらない',
+      afterLate.visual === 'userActions lateGiftButton OURS placementTracking',
+      `DOM=[${afterLate.dom}] 見た目=[${afterLate.visual}] 元=[${beforeLate}]`);
+
     let reloaded = false;
     page.on('framenavigated', () => { reloaded = true; });
     await page.evaluate(() => {

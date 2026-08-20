@@ -117,6 +117,21 @@
   margin-right: 8px;
 }
 
+/* X はプロフィールの操作行にボタンを後から足すことがある（サブスク等）。
+   Followボタンの直前に挿しても、後から生えたものがこちらとFollowの間に割り込むので、
+   同じプロフィールでもリロードのたびに並び順が変わる。
+   DOM上の位置に関係なく「X のボタン群 → こちら → Follow」に固定する。
+   :has() が無い環境では order を付けないでおく（付けるとFollowより右へ行ってしまう） */
+@supports selector(:has(*)) {
+  .twblock-btn-container.twblock-profile {
+    order: 1;
+  }
+
+  div:has(> .twblock-btn-container.twblock-profile) > [data-testid="placementTracking"] {
+    order: 2;
+  }
+}
+
 .twblock-btn-container.twblock-profile .twblock-btn {
   width: 36px;
   height: 36px;
