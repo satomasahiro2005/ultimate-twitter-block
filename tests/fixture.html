@@ -16,7 +16,9 @@
   .actionbar { display: flex; flex-direction: row; width: 420px; justify-content: space-between; }
   /* 引用ツイートのカード。実物は flex の縦並びで、横には縮まない。
      ここが伸び縮みしないので、バーの padding が幅に足し算されるとはみ出す */
-  .quote { display: flex; flex-direction: column; border: 1px solid #888; border-radius: 12px; }
+  .quote { display: flex; flex-direction: column; border: 1px solid #888; border-radius: 12px;
+           /* 実物と同じ。畳んだときバーより高くなるので、余りの落ち方が出る */
+           min-height: 64px; }
 </style>
 </head>
 <body>

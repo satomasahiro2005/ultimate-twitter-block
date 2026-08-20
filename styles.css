@@ -285,6 +285,14 @@
   75% { transform: translateX(3px); }
 }
 
+/* 引用ツイートのカードは min-height:64px を持っていて、畳むと 57px のバーだけが残る。
+   flex の縦並びなので余りが全部下に落ち、下だけ 5px 長く見える。
+   畳んだ親は可視の子がバー1枚だけなので、中央に置いて差を分ける。
+   横並びの親では主軸が水平で、バーが width:100% なので何も起きない */
+[data-twblock-collapsed] {
+  justify-content: center;
+}
+
 /* ---- ブロック/ミュート後の非表示バー ---- */
 .twblock-hidden-bar {
   display: flex;

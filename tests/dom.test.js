@@ -867,6 +867,10 @@ function startServer() {
         boxSizing: getComputedStyle(bar).boxSizing,
         overflowRight: Math.round(r.right - br.right),
         buttonOverflow: Math.round(Math.max(...btns.map((b) => b.getBoundingClientRect().right)) - br.right),
+        above: Math.round(r.top - br.top),
+        below: Math.round(br.bottom - r.bottom),
+        cardHeight: Math.round(br.height),
+        barHeight: Math.round(r.height),
         outerIntact: !document.querySelector('article[data-twblock-author="sam"] > .twblock-hidden-bar'),
       };
     });
@@ -880,6 +884,10 @@ function startServer() {
     check('引用: ボタンがカードの内側に収まる',
       quotedBar.buttonOverflow !== undefined && quotedBar.buttonOverflow <= 0,
       `button が ${quotedBar.buttonOverflow}px はみ出し`);
+    // カードの min-height がバーより高いと、余りが全部下に落ちて下だけ長く見える
+    check('引用: バーがカードの上下中央に来る',
+      quotedBar.above !== undefined && Math.abs(quotedBar.above - quotedBar.below) <= 1,
+      `上 ${quotedBar.above}px / 下 ${quotedBar.below}px`);
 
 
   } finally {
