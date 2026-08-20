@@ -287,6 +287,19 @@ function startServer() {
         barWidth: bar ? Math.round(bar.getBoundingClientRect().width) : 0,
         contentWidth: inner ? Math.round(art.clientWidth - 16) : 0,
         barBorderBottom: bar ? getComputedStyle(bar).borderBottomWidth : null,
+        labelOffset: bar ? Math.round(
+          bar.querySelector('.twblock-hidden-label').getBoundingClientRect().left
+          - bar.getBoundingClientRect().left) : null,
+        undoIsRightmost: (() => {
+          if (!bar) return null;
+          const bs = [...bar.querySelectorAll('button')];
+          if (bs.length < 2) return null;
+          const last = bs[bs.length - 1];
+          return !/(ブロックに切替|Switch to block|切换为屏蔽)/.test(last.textContent);
+        })(),
+        buttonsRight: bar ? Math.round(
+          Math.max(...[...bar.querySelectorAll('button')].map((b) => b.getBoundingClientRect().right))) : null,
+        barRight: bar ? Math.round(bar.getBoundingClientRect().right) : null,
         buttons: bar ? [...bar.querySelectorAll('button')].map((b) => b.textContent) : [],
         contentHidden: art.children[1] ? art.children[1].style.display === 'none' : false,
         stored: JSON.parse(localStorage.getItem('twblock_blockedUsersV2') || '{}'),
@@ -299,9 +312,17 @@ function startServer() {
       `bar=${muted.barWidth} content=${muted.contentWidth}`);
     check('ミュート: 自前の下線を引かない（Xの区切り線と二重になる）',
       muted.barBorderBottom === '0px', muted.barBorderBottom);
+    check('ミュート: バーの中身は左寄せ（幅いっぱいにすると中央に飛ぶ）',
+      muted.labelOffset !== null && muted.labelOffset <= 20,
+      `label は左端から ${muted.labelOffset}px`);
     check('ミュート: 本文が隠れる', muted.contentHidden);
     check('ミュート: mutes/users/create.json を叩いた', muted.muteCall);
     check('要望: バーに「ブロックに切替」が出る', muted.buttons.length >= 2, JSON.stringify(muted.buttons));
+    check('並び: 戻すボタンが一番右（押した直後のカーソルに近い）',
+      muted.undoIsRightmost === true, JSON.stringify(muted.buttons));
+    check('並び: ボタン群が行の右端に寄る',
+      muted.buttonsRight !== null && muted.buttonsRight >= muted.barRight - 24,
+      `buttons=${muted.buttonsRight} bar=${muted.barRight}`);
     check('保存: mute 状態が記録される',
       Boolean(muted.stored.bob && muted.stored.bob.m === 1), JSON.stringify(muted.stored));
 
@@ -309,7 +330,8 @@ function startServer() {
     await page.evaluate(() => {
       const bar = document.querySelector('article[data-twblock-author="bob"] > .twblock-hidden-bar');
       const buttons = [...bar.querySelectorAll('button')];
-      buttons[1].click();
+      // 役割で選ぶ（並び順を変えても壊れないように）
+      bar.querySelector('.twblock-bar-danger').click();
     });
     await page.evaluate(() => new Promise((r) => setTimeout(r, 900)));
     const escalated = await page.evaluate(() => {
@@ -338,7 +360,7 @@ function startServer() {
     });
     await page.evaluate(() => {
       const bar = document.querySelector('article[data-twblock-author="bob"] > .twblock-hidden-bar');
-      bar.querySelector('button').click();  // ブロック解除
+      bar.querySelector('button:not(.twblock-bar-danger)').click();  // ブロック解除
     });
     await page.evaluate(() => new Promise((r) => setTimeout(r, 900)));
     const afterStuckUndo = await page.evaluate(() => {
@@ -360,7 +382,7 @@ function startServer() {
     // ミュート側も解除して、本文が戻ることを確認
     await page.evaluate(() => {
       const bar = document.querySelector('article[data-twblock-author="bob"] > .twblock-hidden-bar');
-      bar.querySelector('button').click();
+      bar.querySelector('button:not(.twblock-bar-danger)').click();
     });
     await page.evaluate(() => new Promise((r) => setTimeout(r, 900)));
     const fullyCleared = await page.evaluate(() => {
@@ -476,7 +498,7 @@ function startServer() {
     // 解除だけ 429（レート制限）で失敗させる
     await page.evaluate(() => { window.__apiReply = { status: 429, body: { errors: [{ code: 88 }] } }; });
     await page.evaluate(() => {
-      document.querySelector('article[data-twblock-author="heidi"] > .twblock-hidden-bar button').click();
+      document.querySelector('article[data-twblock-author="heidi"] > .twblock-hidden-bar button:not(.twblock-bar-danger)').click();
     });
     await page.evaluate(() => new Promise((r) => setTimeout(r, 900)));
     const stuck = await page.evaluate(() => {
@@ -558,7 +580,7 @@ function startServer() {
 
     await page.evaluate(() => {
       const bar = document.querySelectorAll('article[data-twblock-author="judy"] > .twblock-hidden-bar')[0];
-      [...bar.querySelectorAll('button')][1].click();  // ブロックに切替
+      bar.querySelector('.twblock-bar-danger').click();  // ブロックに切替
     });
     await page.evaluate(() => new Promise((r) => setTimeout(r, 1000)));
     const barsAfterEscalate = await page.evaluate(() => {
@@ -579,8 +601,8 @@ function startServer() {
     const statsBefore = await page.evaluate(() => JSON.parse(localStorage.getItem('twblock_stats') || '{}'));
     await page.evaluate(() => {
       const bars = [...document.querySelectorAll('article[data-twblock-author="judy"] > .twblock-hidden-bar')];
-      const btns = [...bars[1].querySelectorAll('button')];
-      if (btns[1]) btns[1].click();
+      const esc = bars[1].querySelector('.twblock-bar-danger');
+      if (esc) esc.click();
     });
     await page.evaluate(() => new Promise((r) => setTimeout(r, 700)));
     const statsAfter = await page.evaluate(() => ({
@@ -597,7 +619,7 @@ function startServer() {
     await page.evaluate(() => { window.__apiReply = { status: 500, body: {} }; });
     await page.evaluate(() => {
       const bar = document.querySelector('article[data-twblock-author="judy"] > .twblock-hidden-bar');
-      bar.querySelector('button').click();  // ブロック解除 → 500 で失敗
+      bar.querySelector('button:not(.twblock-bar-danger)').click();  // ブロック解除 → 500 で失敗
     });
     await page.evaluate(() => new Promise((r) => setTimeout(r, 900)));
     await page.evaluate(() => {

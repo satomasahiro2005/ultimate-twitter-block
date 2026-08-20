@@ -1150,6 +1150,9 @@
 
     bar.textContent = '';
 
+    // ボタンの並びは「危険なほうが左、戻すほうが右」。
+    // ブロック/ミュートは行の右端にあるので、押した直後のカーソルからは
+    // 右端のボタンが一番近い。最頻の操作である「戻す」をそこへ置く
     const label = document.createElement('span');
     label.className = 'twblock-hidden-label';
     // プロフィールの通知バーは、その人のページにいるので相手のIDを出さない
@@ -1157,29 +1160,6 @@
     bar.appendChild(label);
 
     if (options.undo !== false) {
-    const undoBtn = makeBarButton(undoLabel);
-    undoBtn.addEventListener('click', async (e) => {
-      e.preventDefault();
-      e.stopPropagation();
-      undoBtn.disabled = true;
-      undoBtn.textContent = '…';
-
-      const result = await sendAction(undoAction, screenName);
-      if (isUndoSettled(result)) {
-        setUserState(screenName, action, 0);
-        syncButtons(screenName);
-        showToast(result.success ? msg(undoToastKey, screenName) : msg('toastStateSynced', screenName));
-        refreshHiddenForUser(screenName);
-      } else {
-        undoBtn.disabled = false;
-        undoBtn.textContent = undoLabel;
-        showToast(errorMessage(result));
-        appendForceButton(bar, screenName);
-      }
-    });
-    bar.appendChild(undoBtn);
-    }
-
     // ミュート済みからブロックへ切り替え（ボタンの押し間違い救済）。
     // ブロックボタンを隠す設定は「TLを散らかしたくない」であって
     // 「ブロックしない」ではないので、ここには出す
@@ -1217,6 +1197,29 @@
         }
       });
       bar.appendChild(upgradeBtn);
+    }
+
+    const undoBtn = makeBarButton(undoLabel);
+    undoBtn.addEventListener('click', async (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      undoBtn.disabled = true;
+      undoBtn.textContent = '…';
+
+      const result = await sendAction(undoAction, screenName);
+      if (isUndoSettled(result)) {
+        setUserState(screenName, action, 0);
+        syncButtons(screenName);
+        showToast(result.success ? msg(undoToastKey, screenName) : msg('toastStateSynced', screenName));
+        refreshHiddenForUser(screenName);
+      } else {
+        undoBtn.disabled = false;
+        undoBtn.textContent = undoLabel;
+        showToast(errorMessage(result));
+        appendForceButton(bar, screenName);
+      }
+    });
+    bar.appendChild(undoBtn);
     }
 
     if (options.reload) {
