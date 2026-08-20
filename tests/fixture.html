@@ -9,7 +9,10 @@
   .col { display: flex; flex-direction: column; }
   .ml12 { margin-left: 12px; }
   .wide { width: 520px; }
-  article { display: block; border-bottom: 1px solid #ccc; padding: 8px; }
+  /* 実物の article[data-testid=tweet] は flex の行。block にすると
+     「バーが文字幅に縮む」類の不具合が再現しない */
+  article { display: flex; flex-direction: row; border-bottom: 1px solid #ccc; padding: 8px; width: 560px; }
+  article > div { flex: 1 1 auto; min-width: 0; }
   .actionbar { display: flex; flex-direction: row; width: 420px; justify-content: space-between; }
 </style>
 </head>

@@ -281,8 +281,12 @@ function startServer() {
     const muted = await page.evaluate(() => {
       const art = document.querySelector('article[data-twblock-author="bob"]');
       const bar = art.querySelector(':scope > .twblock-hidden-bar');
+      const inner = art.children[1];
       return {
         hasBar: Boolean(bar),
+        barWidth: bar ? Math.round(bar.getBoundingClientRect().width) : 0,
+        contentWidth: inner ? Math.round(art.clientWidth - 16) : 0,
+        barBorderBottom: bar ? getComputedStyle(bar).borderBottomWidth : null,
         buttons: bar ? [...bar.querySelectorAll('button')].map((b) => b.textContent) : [],
         contentHidden: art.children[1] ? art.children[1].style.display === 'none' : false,
         stored: JSON.parse(localStorage.getItem('twblock_blockedUsersV2') || '{}'),
@@ -290,6 +294,11 @@ function startServer() {
       };
     });
     check('ミュート: 非表示バーが出る', muted.hasBar);
+    check('ミュート: バーが行いっぱいに広がる（文字幅に縮まない）',
+      muted.barWidth > 0 && muted.barWidth >= muted.contentWidth - 1,
+      `bar=${muted.barWidth} content=${muted.contentWidth}`);
+    check('ミュート: 自前の下線を引かない（Xの区切り線と二重になる）',
+      muted.barBorderBottom === '0px', muted.barBorderBottom);
     check('ミュート: 本文が隠れる', muted.contentHidden);
     check('ミュート: mutes/users/create.json を叩いた', muted.muteCall);
     check('要望: バーに「ブロックに切替」が出る', muted.buttons.length >= 2, JSON.stringify(muted.buttons));
@@ -716,6 +725,48 @@ function startServer() {
 
     await page.evaluate(() => {
       document.documentElement.lang = 'en';
+      const s = { showBlock: true, showMute: true, confirmBlockFollowing: true, language: 'en' };
+      localStorage.setItem('twblock_settings', JSON.stringify(s));
+      window.dispatchEvent(new StorageEvent('storage', { key: 'twblock_settings', newValue: JSON.stringify(s) }));
+    });
+    await page.evaluate(() => new Promise((r) => setTimeout(r, 700)));
+
+    // ---------------------------------------------------------------
+    // 11c. ブロックボタンを隠していても、バーの「ブロックに切替」は出す
+    // ---------------------------------------------------------------
+    await page.evaluate(() => {
+      window.__apiReply = { success: true, body: { ok: 1 } };
+      const s = { showBlock: false, showMute: true, confirmBlockFollowing: false, language: 'ja' };
+      localStorage.setItem('twblock_settings', JSON.stringify(s));
+      window.dispatchEvent(new StorageEvent('storage', { key: 'twblock_settings', newValue: JSON.stringify(s) }));
+    });
+    await page.evaluate(() => new Promise((r) => setTimeout(r, 700)));
+    await page.evaluate(() => {
+      window.reset();
+      history.replaceState({}, '', '/home');
+      document.getElementById('root').appendChild(window.buildTweet('rita'));
+    });
+    await page.evaluate(() => new Promise((r) => setTimeout(r, 600)));
+    const hiddenBlockBtn = await page.evaluate(() => ({
+      blockButtons: document.querySelectorAll('article[data-twblock-author="rita"] .twblock-block').length,
+      muteButtons: document.querySelectorAll('article[data-twblock-author="rita"] .twblock-mute').length,
+    }));
+    check('設定: ブロックボタンを隠すとTLには出ない',
+      hiddenBlockBtn.blockButtons === 0 && hiddenBlockBtn.muteButtons === 1, JSON.stringify(hiddenBlockBtn));
+
+    await page.evaluate(() => {
+      document.querySelector('article[data-twblock-author="rita"] .twblock-mute').click();
+    });
+    await page.evaluate(() => new Promise((r) => setTimeout(r, 900)));
+    const barWithHiddenBlock = await page.evaluate(() => {
+      const bar = document.querySelector('article[data-twblock-author="rita"] > .twblock-hidden-bar');
+      return bar ? [...bar.querySelectorAll('button')].map((b) => b.textContent) : null;
+    });
+    check('設定: それでもバーには「ブロックに切替」が出る',
+      Array.isArray(barWithHiddenBlock) && barWithHiddenBlock.length === 2,
+      JSON.stringify(barWithHiddenBlock));
+
+    await page.evaluate(() => {
       const s = { showBlock: true, showMute: true, confirmBlockFollowing: true, language: 'en' };
       localStorage.setItem('twblock_settings', JSON.stringify(s));
       window.dispatchEvent(new StorageEvent('storage', { key: 'twblock_settings', newValue: JSON.stringify(s) }));

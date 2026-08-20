@@ -1180,8 +1180,10 @@
     bar.appendChild(undoBtn);
     }
 
-    // ミュート済みからブロックへ切り替え（ボタンの押し間違い救済）
-    if (action === 'mute' && showBlock) {
+    // ミュート済みからブロックへ切り替え（ボタンの押し間違い救済）。
+    // ブロックボタンを隠す設定は「TLを散らかしたくない」であって
+    // 「ブロックしない」ではないので、ここには出す
+    if (action === 'mute') {
       const upgradeBtn = makeBarButton(msg('switchToBlockLabel'), 'twblock-bar-danger');
       upgradeBtn.addEventListener('click', async (e) => {
         e.preventDefault();
