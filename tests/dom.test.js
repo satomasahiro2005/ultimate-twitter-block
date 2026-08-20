@@ -420,12 +420,16 @@ function startServer() {
       return {
         hasNotice: Boolean(notice),
         buttons: notice ? [...notice.querySelectorAll('button')].map((b) => b.textContent) : [],
+        label: notice ? notice.querySelector('.twblock-hidden-label').textContent : null,
         stillOnProfile: location.pathname === '/frank',
       };
     });
+    check('プロフィール: 通知バーに相手のIDが出る',
+      Boolean(profileAfter.label && profileAfter.label.includes('@frank')), profileAfter.label);
     check('要望: プロフィールのブロックでリロードしない', reloaded === false && profileAfter.stillOnProfile);
     check('要望: 代わりに通知バーが出る', profileAfter.hasNotice);
-    check('要望: 通知バーに解除と再読み込みがある', profileAfter.buttons.length >= 3, JSON.stringify(profileAfter.buttons));
+    check('要望: 通知バーに解除と再読み込みがある',
+      profileAfter.buttons.length === 2, JSON.stringify(profileAfter.buttons));
 
     // ミュートでは通知バーを出さない（X側の表示が変わらないので出す意味がない）
     await page.evaluate(() => {

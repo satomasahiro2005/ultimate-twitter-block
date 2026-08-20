@@ -134,7 +134,8 @@ window.buildTweet = function (screenName, opts) {
   return article;
 };
 
-window.buildProfile = function (screenName) {
+window.buildProfile = function (screenName, opts) {
+  opts = opts || {};
   const wrap = document.createElement('div');
   wrap.setAttribute('data-testid', 'primaryColumn');
   const header = document.createElement('div');
@@ -147,6 +148,14 @@ window.buildProfile = function (screenName) {
   more.setAttribute('data-testid', 'userActions');
   more.textContent = '⋯';
   actionRow.appendChild(more);
+
+  // DM / 通知 / サブスクなど、X 側のボタンを増やす
+  for (let i = 0; i < (opts.extras || 0); i++) {
+    const extra = document.createElement('button');
+    extra.setAttribute('data-testid', 'profileExtra' + i);
+    extra.textContent = 'x';
+    actionRow.appendChild(extra);
+  }
 
   const placement = document.createElement('div');
   placement.className = 'col';

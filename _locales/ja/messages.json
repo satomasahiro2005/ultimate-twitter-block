@@ -58,8 +58,6 @@
   "switchToBlockLabel": { "message": "ブロックに切替" },
   "forceShowLabel": { "message": "強制的に表示" },
   "reloadLabel": { "message": "再読み込み" },
-  "dismissLabel": { "message": "閉じる" },
-  "profileStaleHint": { "message": "X側の表示は再読み込みするまで変わりません" },
   "errorNoAuth": { "message": "認証情報が取得できません。ページを操作してから再試行してください。" },
   "errorForbidden": { "message": "セッションが期限切れです。ページを再読み込みしてください。" },
   "errorRateLimited": { "message": "レート制限に達しました。しばらく待ってから再試行してください。" },

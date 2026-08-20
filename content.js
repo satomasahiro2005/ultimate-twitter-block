@@ -136,9 +136,9 @@
   const I18N_CACHE_KEYS = [
     'blockLabel', 'muteLabel', 'blockedStatus', 'mutedStatus',
     'unblockLabel', 'unmuteLabel', 'switchToBlockLabel', 'forceShowLabel',
-    'reloadLabel', 'profileStaleHint',
+    'reloadLabel',
     'errorTimeout', 'errorOccurred', 'errorNoAuth', 'errorForbidden',
-    'errorRateLimited', 'errorNetwork', 'errorHttp', 'dismissLabel',
+    'errorRateLimited', 'errorNetwork', 'errorHttp',
     'toastBlocked', 'toastMuted', 'toastUnblocked', 'toastUnmuted',
     'toastStateSynced', 'confirmBlockFollowing', 'confirmBlockUnknown',
   ];
@@ -1072,7 +1072,7 @@
 
     const label = document.createElement('span');
     label.className = 'twblock-hidden-label';
-    label.textContent = statusLabel + ' @' + screenName + (options.hint ? ' — ' + options.hint : '');
+    label.textContent = statusLabel + ' @' + screenName;
     bar.appendChild(label);
 
     const undoBtn = makeBarButton(undoLabel);
@@ -1144,17 +1144,6 @@
       bar.appendChild(reloadBtn);
     }
 
-    if (options.dismissible) {
-      const closeBtn = makeBarButton('×', 'twblock-bar-close');
-      closeBtn.setAttribute('aria-label', msg('dismissLabel'));
-      closeBtn.title = msg('dismissLabel');
-      closeBtn.addEventListener('click', (e) => {
-        e.preventDefault();
-        e.stopPropagation();
-        closeStateBar(bar);
-      });
-      bar.appendChild(closeBtn);
-    }
   }
 
   // API側で解除できないときの最後の逃げ道: ローカル記録だけを消して再表示する。
@@ -1281,11 +1270,11 @@
 
     const bar = createStateBar(screenName, {
       className: 'twblock-notice-bar',
-      hint: msg('profileStaleHint'),
       reload: true,
-      dismissible: true,
     });
     bar.setAttribute('data-twblock-path', location.pathname);
+    // リンクの色は X のテーマ色に合わせる
+    bar.style.setProperty('--twblock-accent', getAccentColor());
     anchor.appendChild(bar);
   }
 

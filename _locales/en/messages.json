@@ -58,8 +58,6 @@
   "switchToBlockLabel": { "message": "Switch to block" },
   "forceShowLabel": { "message": "Show anyway" },
   "reloadLabel": { "message": "Reload" },
-  "dismissLabel": { "message": "Dismiss" },
-  "profileStaleHint": { "message": "X's own view stays as-is until you reload" },
   "errorNoAuth": { "message": "Could not read your session. Interact with the page and try again." },
   "errorForbidden": { "message": "Your session expired. Reload the page." },
   "errorRateLimited": { "message": "Rate limited. Wait a moment and try again." },

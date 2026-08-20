@@ -58,8 +58,6 @@
   "switchToBlockLabel": { "message": "切换为屏蔽" },
   "forceShowLabel": { "message": "强制显示" },
   "reloadLabel": { "message": "重新载入" },
-  "dismissLabel": { "message": "关闭" },
-  "profileStaleHint": { "message": "X 的显示要重新载入后才会更新" },
   "errorNoAuth": { "message": "无法获取登录信息。请先在页面上操作后重试。" },
   "errorForbidden": { "message": "会话已过期。请重新载入页面。" },
   "errorRateLimited": { "message": "已达到频率限制。请稍后再试。" },

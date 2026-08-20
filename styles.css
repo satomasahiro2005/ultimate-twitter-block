@@ -130,6 +130,7 @@
   div:has(> .twblock-btn-container.twblock-profile) > [data-testid="placementTracking"] {
     order: 2;
   }
+
 }
 
 .twblock-btn-container.twblock-profile .twblock-btn {
@@ -338,21 +339,38 @@
   color: rgb(113, 118, 123);
 }
 
-.twblock-show-btn.twblock-bar-close {
+/* ---- プロフィールでブロックした直後の通知バー ----
+   X 純正の「You have muted posts from this account. Unmute」に合わせる。
+   枠も背景も持たず、15px/20px のグレー本文＋アクセント色のテキストリンク。
+   採寸値: color rgb(113,118,123) / link rgb(29,155,240) / margin 12px 0 / padding 0 */
+.twblock-notice-bar {
+  display: block;
+  margin: 12px 0;
+  padding: 0;
   border: none;
-  padding: 4px 8px;
-  font-size: 16px;
-  line-height: 1;
-  color: rgb(113, 118, 123);
+  font-size: 15px;
+  line-height: 20px;
 }
 
-/* ---- プロフィールでブロックした直後の通知バー ---- */
-.twblock-notice-bar {
-  justify-content: flex-start;
-  margin-top: 12px;
-  border: 1px solid light-dark(rgb(207, 217, 222), rgb(47, 51, 54));
-  border-radius: 12px;
-  padding: 10px 12px;
+.twblock-notice-bar .twblock-hidden-label {
+  font-size: 15px;
+  line-height: 20px;
+}
+
+.twblock-notice-bar .twblock-show-btn {
+  border: none;
+  border-radius: 0;
+  padding: 0;
+  margin-left: 8px;
+  background: none;
+  font-size: 15px;
+  line-height: 20px;
+  color: var(--twblock-accent, rgb(29, 155, 240));
+}
+
+.twblock-notice-bar .twblock-show-btn:hover:not(:disabled) {
+  background: none;
+  text-decoration: underline;
 }
 
 /* ---- トースト通知 ---- */
