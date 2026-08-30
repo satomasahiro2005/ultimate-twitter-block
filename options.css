@@ -151,10 +151,6 @@ h1 .subtitle {
   transform: translateY(1px);
 }
 
-.btn:disabled {
-  opacity: 0.55;
-  cursor: default;
-}
 
 .btn-danger {
   color: var(--danger);

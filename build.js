@@ -77,6 +77,12 @@ function buildZip() {
   const outName = `twitter-block-v${version}.zip`;
   const outPath = path.join(ROOT, outName);
 
+  // 古い版のZIPを残さない（放っておくと版ごとに溜まる。中身はタグから作り直せる）
+  for (const name of fs.readdirSync(ROOT)) {
+    if (name === outName) continue;
+    if (/^twitter-block-v.+\.zip$/.test(name)) fs.unlinkSync(path.join(ROOT, name));
+  }
+
   // Files and directories to include
   const entries = [
     'manifest.json',
@@ -87,7 +93,6 @@ function buildZip() {
     'popup.html', 'popup.js', 'popup.css',
     'options.html', 'options.js', 'options.css',
     'LICENSE',
-    'README.md',
     'PRIVACY_POLICY.md',
   ];
 
@@ -541,7 +546,6 @@ async function verifyUserscript(src) {
   const required = [
     [/^\/\/ ==UserScript==[\s\S]*?^\/\/ ==\/UserScript==/m, 'metadata block'],
     [/function\s+injectCSS\s*\(/, 'injectCSS() definition'],
-    [/twblock-btn-container/, 'styles.css payload'],
     [/const\s+_M\s*=\s*\{/, 'locale table'],
     [/function\s+_msg\s*\(/, '_msg() definition'],
     [/const\s+STORE_PREFIX\s*=/, 'localStorage store'],

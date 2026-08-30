@@ -11,56 +11,15 @@
 
 const fs = require('fs');
 const path = require('path');
-const http = require('http');
 
-const ROOT = path.join(__dirname, '..');
+const { ROOT, findChrome, loadPuppeteer, startServer } = require('./helpers');
 const USERSCRIPT = path.join(ROOT, 'userscripts', 'twitter-block.user.js');
 
-const CHROME_CANDIDATES = [
-  process.env.CHROME_PATH,
-  'C:/Program Files/Google/Chrome/Application/chrome.exe',
-  'C:/Program Files (x86)/Google/Chrome/Application/chrome.exe',
-  '/usr/bin/google-chrome',
-  '/usr/bin/chromium',
-  '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome',
-].filter(Boolean);
-
-function findChrome() {
-  for (const p of CHROME_CANDIDATES) {
-    try { if (fs.existsSync(p)) return p; } catch (err) { /* noop */ }
-  }
-  return null;
-}
-
-function loadPuppeteer() {
-  const candidates = [
-    'puppeteer-core',
-    path.join(process.env.USERPROFILE || process.env.HOME || '', 'node_modules', 'puppeteer-core'),
-  ];
-  for (const id of candidates) {
-    try { return require(id); } catch (err) { /* noop */ }
-  }
-  return null;
-}
 
 const results = [];
 function check(name, ok, detail) {
   results.push({ name, ok: Boolean(ok), detail: detail === undefined ? '' : String(detail) });
   console.log(`${ok ? 'PASS' : 'FAIL'}  ${name}${detail !== undefined && !ok ? '  -> ' + detail : ''}`);
-}
-
-function startServer() {
-  const server = http.createServer((req, res) => {
-    const file = path.join(__dirname, 'fixture.html');
-    res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
-    res.end(fs.readFileSync(file));
-  });
-  server.on('error', (err) => {
-    console.error('fixture server error: ' + err.message);
-    process.exit(1);
-  });
-  // ポートは OS に選ばせる（固定だと他のプロセスと衝突する）
-  return new Promise((resolve) => server.listen(0, '127.0.0.1', () => resolve(server)));
 }
 
 (async () => {
@@ -258,7 +217,10 @@ function startServer() {
     // 同じDOMをもう一度 processAll に通しても増えない
     await page.evaluate(() => {
       document.querySelectorAll('[data-twblock]').forEach((el) => el.removeAttribute('data-twblock'));
-      document.getElementById('root').appendChild(document.createComment('poke'));
+      // observer は data-testid を持つ要素の追加しか拾わない。コメントノードでは走らない
+      const poke = document.createElement('div');
+      poke.setAttribute('data-testid', 'poke');
+      document.getElementById('root').appendChild(poke);
     });
     await page.evaluate(() => new Promise((r) => setTimeout(r, 500)));
     const tweetAfterRescan = await page.evaluate(() => {
@@ -329,7 +291,6 @@ function startServer() {
     // 「ブロックに切替」を押す
     await page.evaluate(() => {
       const bar = document.querySelector('article[data-twblock-author="bob"] > .twblock-hidden-bar');
-      const buttons = [...bar.querySelectorAll('button')];
       // 役割で選ぶ（並び順を変えても壊れないように）
       bar.querySelector('.twblock-bar-danger').click();
     });
@@ -612,6 +573,9 @@ function startServer() {
     check('同一ユーザー: ブロックが二重にカウントされない',
       (statsAfter.stats.blocked || 0) === (statsBefore.blocked || 0),
       JSON.stringify(statsAfter));
+    check('同一ユーザー: ブロックAPIも二度投げない',
+      statsAfter.blockCalls === barsAfterEscalate.blockCalls,
+      `${barsAfterEscalate.blockCalls} -> ${statsAfter.blockCalls}`);
 
     // ---------------------------------------------------------------
     // 9. block と mute の両方が立っている状態での「強制的に表示」
@@ -888,6 +852,76 @@ function startServer() {
     check('引用: バーがカードの上下中央に来る',
       quotedBar.above !== undefined && Math.abs(quotedBar.above - quotedBar.below) <= 1,
       `上 ${quotedBar.above}px / 下 ${quotedBar.below}px`);
+
+    // ---------------------------------------------------------------
+    // 狭い画面: ヘッダーに Follow ボタンが足されると、X は caret/grok を
+    // 1段内側の行に包み直す。先に入れたボタンだけ外側の行に取り残されると、
+    // 行の高さが変わって 6px 浮く（実測: 他は中心 y=81、うちだけ 75）
+    // ---------------------------------------------------------------
+    await page.evaluate(() => {
+      window.reset();
+      document.getElementById('root').appendChild(window.buildTweet('nate'));
+    });
+    await page.evaluate(() => new Promise((r) => setTimeout(r, 400)));
+    const beforeNarrow = await page.evaluate(() =>
+      document.querySelectorAll('article[data-testid="tweet"] .twblock-btn-container').length);
+    check('狭い画面: まず通常どおりボタンが1つ入る', beforeNarrow === 1, `got ${beforeNarrow}`);
+
+    await page.evaluate(() => {
+      const bar = document.querySelector('article .actionbar');
+      const inner = document.createElement('div');
+      inner.className = 'row';
+      [...bar.children].forEach((child) => {
+        if (child.querySelector('[aria-label^="Grok"], [data-testid="caret"]')) inner.appendChild(child);
+      });
+      const followWrap = document.createElement('div');
+      followWrap.className = 'row';
+      const follow = document.createElement('button');
+      follow.setAttribute('data-testid', '77-follow');
+      follow.textContent = 'Follow';
+      followWrap.appendChild(follow);
+      inner.insertBefore(followWrap, inner.firstChild);
+      bar.appendChild(inner);
+    });
+    await page.evaluate(() => new Promise((r) => setTimeout(r, 600)));
+
+    const narrow = await page.evaluate(() => {
+      const art = document.querySelector('article[data-testid="tweet"]');
+      const inner = [...art.querySelectorAll('.row')].find((r) => r.querySelector('[aria-label^="Grok"]'));
+      const cont = art.querySelector('.twblock-btn-container');
+      const mid = (el) => { const r = el.getBoundingClientRect(); return r.top + r.height / 2; };
+      return {
+        count: art.querySelectorAll('.twblock-btn-container').length,
+        inGrokRow: Boolean(inner && inner.querySelector(':scope > .twblock-btn-container')),
+        beforeFollow: Boolean(cont.nextElementSibling && cont.nextElementSibling.querySelector('[data-testid$="-follow"]')),
+        gap: Math.abs(mid(cont) - mid(art.querySelector('[data-testid="caret"]'))),
+      };
+    });
+    check('狭い画面: Follow が足されたらボタンをgrok行へ入れ直す', narrow.inGrokRow, JSON.stringify(narrow));
+    check('狭い画面: Follow の左に置く', narrow.beforeFollow, JSON.stringify(narrow));
+    check('狭い画面: 入れ直しても二重にならない', narrow.count === 1, `got ${narrow.count}`);
+    check('狭い画面: caret と同じ高さに揃う', narrow.gap <= 1, `ずれ ${narrow.gap}px`);
+
+    // X はこの行を後から作り直して並べ替える。Follow の後・grok の前に戻ること
+    await page.evaluate(() => {
+      const inner = [...document.querySelectorAll('article .row')].find((r) => r.querySelector('[aria-label^="Grok"]'));
+      inner.appendChild(inner.querySelector('.twblock-btn-container'));
+      // 作り直しを模して Follow ボタンを差し替える（X は data-testid ごと作り直す）
+      const wrap = document.querySelector('article [data-testid="77-follow"]').parentElement;
+      wrap.innerHTML = '<button data-testid="77-follow">Follow</button>';
+    });
+    await page.evaluate(() => new Promise((r) => setTimeout(r, 600)));
+    const order = await page.evaluate(() => {
+      const art = document.querySelector('article[data-testid="tweet"]');
+      const cont = art.querySelector('.twblock-btn-container');
+      const next = cont.nextElementSibling;
+      return {
+        count: art.querySelectorAll('.twblock-btn-container').length,
+        beforeFollow: Boolean(next && next.querySelector('[data-testid$="-follow"]')),
+      };
+    });
+    check('狭い画面: 並べ替えられても Follow の直前に戻る', order.beforeFollow, JSON.stringify(order));
+    check('狭い画面: 戻した後も二重にならない', order.count === 1, `got ${order.count}`);
 
 
   } finally {

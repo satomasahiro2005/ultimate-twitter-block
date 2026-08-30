@@ -42,3 +42,11 @@ jobs:
         run: |
           npm install --no-save puppeteer-core@24
           node tests/dom.test.js
+
+      # X は無関係なDOM変化を毎秒何百件も出す。それに反応して再スキャンし続けると
+      # 拡張の仕事がキー入力と同じフレームに乗る（入力欄が引っかかる）
+      - name: Rescan rate
+        env:
+          CHROME_PATH: ${{ steps.chrome.outputs.chrome-path }}
+          REQUIRE_BROWSER: '1'
+        run: node tests/perf.test.js

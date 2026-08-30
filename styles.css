@@ -4,7 +4,6 @@
 .twblock-btn-container {
   display: flex;
   align-items: center;
-  gap: 0;
   flex-shrink: 0;
 }
 
@@ -47,6 +46,32 @@
   margin: -16px -14px;
 }
 
+/* 狭い画面ではヘッダーに Follow ボタン（高さ32pxの丸いピル）が出る。
+   そのときだけ、X のボタンと釣り合うように丸で囲う */
+div:has([data-testid$="-follow"], [data-testid$="-unfollow"]) > .twblock-btn-container.twblock-tweet:not(.twblock-repost) {
+  gap: 6px;
+}
+
+div:has([data-testid$="-follow"], [data-testid$="-unfollow"]) > .twblock-btn-container.twblock-tweet:not(.twblock-repost) .twblock-btn {
+  width: 32px;
+  height: 32px;
+  /* 輪郭だけ Follow ボタンの色を薄く借りる。アイコン自体は caret や ⋯ と同じ灰色のまま
+     （--twblock-follow-tone は content.js が隣の Follow ボタンから実測して入れる） */
+  border: 1px solid color-mix(in srgb, var(--twblock-follow-tone, currentColor) 35%, transparent);
+  border-radius: 9999px;
+}
+
+div:has([data-testid$="-follow"], [data-testid$="-unfollow"]) > .twblock-btn-container.twblock-tweet:not(.twblock-repost) .twblock-btn::before {
+  width: 32px;
+  height: 32px;
+}
+
+/* この行では X の caret や ⋯ が白なので、アイコンもそれに合わせる（行から継承する）。
+   :not(:hover) にしてあるのは、ホバー時の赤/青を上書きしないため */
+div:has([data-testid$="-follow"], [data-testid$="-unfollow"]) > .twblock-btn-container.twblock-tweet:not(.twblock-repost) .twblock-btn:not(:hover) {
+  color: inherit;
+}
+
 .twblock-btn-container.twblock-tweet .twblock-btn svg {
   width: 18.75px;
   height: 18.75px;
@@ -79,11 +104,6 @@
   background-color: rgba(255, 173, 31, 0.1);
 }
 
-/* RT("reposted")行のpadding-top:12pxを上下に分散 */
-.twblock-repost-row .r-ttdzmv {
-  padding-top: 6px;
-  padding-bottom: 6px;
-}
 
 /* RT("reposted")行の親をflex-rowに変更して横並びにする */
 .twblock-repost-row {
@@ -294,6 +314,12 @@
 }
 
 /* ---- ブロック/ミュート後の非表示バー ---- */
+/* 畳んだ投稿の中身。JSでも display:none を入れているが、画像の遅延ロードのように
+   後から足される子はここで隠す。これが無いと隠し直すために毎フレーム走ることになる */
+[data-twblock-collapsed] > *:not(.twblock-hidden-bar) {
+  display: none !important;
+}
+
 .twblock-hidden-bar {
   display: flex;
   align-items: center;

@@ -201,14 +201,13 @@
 
   // 表を読み直して、表示中の文言も差し替える
   let appliedLocale = '(初期)';
-  async function applyLocale(rerender) {
+  async function applyLocale() {
     const locale = resolveLocale();
     const key = locale || '(既定)';
     if (key === appliedLocale) return;
     appliedLocale = key;
     localeTable = locale ? await fetchLocaleTable(locale) : null;
     cacheI18n();
-    if (rerender) rescanAll();
   }
 
   const I18N_CACHE_KEYS = [
@@ -460,12 +459,16 @@
     console.groupEnd();
   }
 
+  // 履歴を読めるのはデバッグイベント経由だけなので、切っている間は溜めない。
+  // 有効化: localStorage.twblock_icon_debug = '1' → リロード、
+  // その後 window.dispatchEvent(new CustomEvent('twblock:debug-icons', { detail: { action: 'history' } }))
   function recordIconDebugSnapshot(snapshot) {
+    if (!iconDebugEnabled) return;
     iconDebugHistory.push(snapshot);
     if (iconDebugHistory.length > MAX_ICON_DEBUG_HISTORY) {
       iconDebugHistory.shift();
     }
-    if (iconDebugEnabled) logIconDebugSnapshot(snapshot);
+    logIconDebugSnapshot(snapshot);
   }
 
   function dumpCurrentMenuIcons(reason) {
@@ -662,6 +665,8 @@
   function loadStoredIcons() {
     return store.get('icons').then((data) => {
       if (data.icons) {
+        // 形式が変わったら捨てる。ここで見ていなかったので、定数を上げても効いていなかった
+        if (data.icons.version !== ICON_CACHE_VERSION) return;
         if (data.icons.block) BLOCK_ICON = data.icons.block;
         if (data.icons.mute) MUTE_ICON = data.icons.mute;
         loadStoredIconSignatures(data.icons.signatures);
@@ -759,6 +764,13 @@
   function extractIconsOnce() {
     if (iconsExtracted || extractStarted) return;
 
+    // アイコン抽出は caret を自分でクリックし、閉じるために Escape を撃つ。
+    // 入力中に走らせると焦点を奪い、Escape が投稿欄に入ってしまう。後回しにする
+    if (isComposing()) {
+      if (++extractRetries <= 20) setTimeout(extractIconsOnce, 3000);
+      return;
+    }
+
     // 自分のツイートのメニューには Block/Mute が無いので、他人のツイートのcaretを選ぶ
     const me = getMyScreenName();
     let caret = null;
@@ -838,6 +850,16 @@
       closeMenu();
       setTimeout(finish, 200);
     }, 3000);
+  }
+
+  // 文字を打っている最中か。焦点が投稿欄にあるか、下書きが残っていれば触らない
+  function isComposing() {
+    const active = document.activeElement;
+    if (active && (active.isContentEditable || active.getAttribute('role') === 'textbox')) return true;
+    for (const box of document.querySelectorAll('[data-testid^="tweetTextarea_"]')) {
+      if (box.textContent && box.textContent.trim()) return true;
+    }
+    return false;
   }
 
   // 抽出のために隠した #layers の子を、メニューでなくなったら戻す。
@@ -1016,11 +1038,12 @@
     }
 
     if (parts.length === 1) {
-      return { screenName, section: null };
+      return { screenName };
     }
 
+    // /user/media や /user/likes も本人のページとして扱う
     if (parts.length === 2 && PROFILE_SUBPATHS.has(parts[1].toLowerCase())) {
-      return { screenName, section: parts[1].toLowerCase() };
+      return { screenName };
     }
 
     return null;
@@ -1370,7 +1393,7 @@
   }
 
   // ---- ボタン作成 ----
-  function createButtons(screenName, tweet) {
+  function createButtons(screenName) {
     if (!showBlock && !showMute) return null;
 
     const container = document.createElement('div');
@@ -1378,10 +1401,10 @@
     container.setAttribute('data-screen-name', screenName);
 
     if (showBlock) {
-      container.appendChild(createButton(screenName, 'block', tweet));
+      container.appendChild(createButton(screenName, 'block'));
     }
     if (showMute) {
-      container.appendChild(createButton(screenName, 'mute', tweet));
+      container.appendChild(createButton(screenName, 'mute'));
     }
 
     return container;
@@ -1430,7 +1453,7 @@
     return window.confirm(msg('confirmBlockFollowing', screenName));
   }
 
-  function createButton(screenName, action, tweet) {
+  function createButton(screenName, action) {
     const btn = document.createElement('button');
     btn.type = 'button';
     btn.className = 'twblock-btn twblock-' + action;
@@ -1540,17 +1563,9 @@
     if (!link) return null;
     const href = link.getAttribute('href');
     if (!href || !/^\/[A-Za-z0-9_]{1,15}$/.test(href)) return null;
-    // "reposted"リンクの親flex-row と リンク要素自体
-    let scRow = link.parentElement;
-    for (let i = 0; i < 3; i++) {
-      if (!scRow) break;
-      const cs = getComputedStyle(scRow);
-      if (cs.display === 'flex' && cs.flexDirection === 'row') break;
-      scRow = scRow.parentElement;
-    }
     // リンクの直接の親(flex-column) — ここをflex-rowにしてボタンを横並びにする
     const scLinkParent = link.parentElement;
-    return { retweeter: href.substring(1), scRow, scLinkParent };
+    return { retweeter: href.substring(1), scLinkParent };
   }
 
   // ツイート本文エリアからscreen_nameを抽出（socialContext内のリンクを除外）
@@ -1561,6 +1576,99 @@
       if (result) return result;
     }
     return null;
+  }
+
+  // 何度やっても取れないものを毎パス触り続けないための共通の数え上げ。
+  // 上限内なら true（もう一度試してよい）、超えたら false（諦める）
+  function countRetry(el) {
+    const tries = Number(el.getAttribute(RETRY_ATTR) || 0) + 1;
+    if (tries >= MAX_TWEET_RETRIES) {
+      el.removeAttribute(RETRY_ATTR);
+      return false;
+    }
+    el.setAttribute(RETRY_ATTR, String(tries));
+    return true;
+  }
+
+  function isTransparentColor(value) {
+    if (!value) return true;
+    if (value === 'transparent') return true;
+    const m = value.match(/^rgba?\(([^)]+)\)$/);
+    if (!m) return false;
+    const parts = m[1].split(',');
+    return parts.length === 4 && Number(parts[3]) === 0;
+  }
+
+  // 行のどこに入れるか。入れ直すときも同じ規則を使う。
+  // ヘッダーに Follow ボタンがあるときはその左（UserCell や プロフィールと同じ並び）、
+  // 無ければ grok/caret の左
+  function headerAnchorNode(row, grokInfo) {
+    const follow = row.querySelector('[data-testid$="-follow"], [data-testid$="-unfollow"]');
+    if (follow) return follow;
+    return (grokInfo && (grokInfo.grokBtn || grokInfo.caret)) || null;
+  }
+
+  function placeTweetButtons(grokInfo, buttons) {
+    const { row } = grokInfo;
+    let anchorChild = null;
+    const anchorNode = headerAnchorNode(row, grokInfo);
+    for (const child of row.children) {
+      if (child.contains(anchorNode)) { anchorChild = child; break; }
+    }
+    if (anchorChild) {
+      row.insertBefore(buttons, anchorChild);
+    } else if (grokInfo.grokBtn) {
+      row.insertBefore(buttons, row.firstChild);
+    } else {
+      row.appendChild(buttons);
+    }
+  }
+
+  // ツイート本体（引用カードでもRT行でもない）のボタン
+  function ownHeaderContainer(tweet) {
+    let keep = null;
+    for (const el of tweet.querySelectorAll('.twblock-btn-container.twblock-tweet')) {
+      if (el.classList.contains('twblock-repost')) continue;
+      if (el.closest('[' + QUOTED_ATTR + ']')) continue;
+      if (el.closest('article') !== tweet) continue;
+      if (!keep) keep = el;
+      else el.remove();
+    }
+    return keep;
+  }
+
+  // 位置の検算用。getComputedStyle を使わずに grok/caret だけ拾う
+  function findGrokRowLite(tweet) {
+    return {
+      grokBtn: tweet.querySelector('[aria-label^="Grok"]'),
+      caret: tweet.querySelector('[data-testid="caret"]'),
+    };
+  }
+
+  // ヘッダーに Follow ボタンが出ている記事の後始末。
+  // 置き場所（行）と並び順（Follow の後・grok の前）を保ち、色を Follow から借りる。
+  // 正しく並んでいる間は DOM の比較だけで済ませ、getComputedStyle は呼ばない
+  // isNew: Follow ボタンが作られ直した回。X が行を組み替えるのはこの瞬間なので、
+  // ここでだけ findGrokRow（getComputedStyle）を回して行を選び直す。
+  // それ以外のパスは並び順の比較だけで済ませる
+  function fixHeaderPlacement(tweet, followBtn, isNew) {
+    const placed = ownHeaderContainer(tweet);
+    if (!placed) return;
+
+    const anchorNode = headerAnchorNode(placed.parentElement, findGrokRowLite(tweet));
+    const next = placed.nextElementSibling;
+    const ordered = Boolean(anchorNode && next && next.contains(anchorNode));
+    if (isNew || !ordered) {
+      const info = findGrokRow(tweet);
+      if (info) placeTweetButtons(info, placed);
+    }
+
+    if (!placed.style.getPropertyValue('--twblock-follow-tone')) {
+      // Follow は塗り、Following は輪郭なので、塗りがあれば背景色・無ければ文字色を借りる
+      const cs = getComputedStyle(followBtn);
+      const tone = isTransparentColor(cs.backgroundColor) ? cs.color : cs.backgroundColor;
+      if (tone) placed.style.setProperty('--twblock-follow-tone', tone);
+    }
   }
 
   function hasOwnContainer(row) {
@@ -1587,7 +1695,7 @@
 
         // RT者のボタンを"reposted"行に挿入
         if (rtInfo && !isMe(rtInfo.retweeter) && rtInfo.scLinkParent && !hasOwnContainer(rtInfo.scLinkParent)) {
-          const rtButtons = createButtons(rtInfo.retweeter, tweet);
+          const rtButtons = createButtons(rtInfo.retweeter);
           if (rtButtons) {
             rtButtons.classList.add('twblock-tweet');
             rtButtons.classList.add('twblock-repost');
@@ -1611,24 +1719,12 @@
         // 元投稿者のボタンをgrok/caret行に挿入
         const grokInfo = findGrokRow(tweet);
         if (grokInfo && !hasOwnContainer(grokInfo.row)) {
-          const { row, grokBtn } = grokInfo;
-          const buttons = createButtons(authorName, tweet);
+          const buttons = createButtons(authorName);
           if (buttons) {
             buttons.classList.add('twblock-tweet');
             buttons.style.marginLeft = 'auto';
             buttons.style.paddingLeft = '4px';
-            let anchorChild = null;
-            const anchorNode = grokBtn || grokInfo.caret;
-            for (const child of row.children) {
-              if (child.contains(anchorNode)) { anchorChild = child; break; }
-            }
-            if (anchorChild) {
-              row.insertBefore(buttons, anchorChild);
-            } else if (grokBtn) {
-              row.insertBefore(buttons, row.firstChild);
-            } else {
-              row.appendChild(buttons);
-            }
+            placeTweetButtons(grokInfo, buttons);
             syncContainer(buttons, authorName);
           }
         }
@@ -1639,16 +1735,14 @@
         if (settled) {
           tweet.setAttribute(PROCESSED, '1');
           tweet.removeAttribute(RETRY_ATTR);
-        } else {
-          const tries = Number(tweet.getAttribute(RETRY_ATTR) || 0) + 1;
-          if (tries >= MAX_TWEET_RETRIES) tweet.setAttribute(PROCESSED, '1');
-          else tweet.setAttribute(RETRY_ATTR, String(tries));
+        } else if (!countRetry(tweet)) {
+          tweet.setAttribute(PROCESSED, '1');
         }
 
         // ブロック/ミュート済みユーザーのツイートを自動非表示
         const blockedAction = primaryAction(getUserState(authorName));
         if (blockedAction && !isViewingProfileTimeline(authorName)) {
-          hideTweet(tweet, authorName, blockedAction);
+          hideTweet(tweet, authorName);
         }
 
         processQuotedTweet(tweet);
@@ -1657,13 +1751,11 @@
         // 途中で失敗したら挿入済みのものを撤去して次パスでやり直す。
         // 引用ツイート側に立てた印も落とさないと、そこだけ二度と処理されない。
         // ただし毎回同じ所で落ちる相手には諦めて、出したり消したりを繰り返さない
-        const tries = Number(tweet.getAttribute(RETRY_ATTR) || 0) + 1;
         tweet.querySelectorAll('.twblock-btn-container').forEach((node) => node.remove());
-        if (tries >= MAX_TWEET_RETRIES) {
+        if (!countRetry(tweet)) {
           tweet.setAttribute(PROCESSED, '1');
           return;
         }
-        tweet.setAttribute(RETRY_ATTR, String(tries));
         tweet.removeAttribute(PROCESSED);
         tweet.querySelectorAll('[' + PROCESSED + ']').forEach((node) => node.removeAttribute(PROCESSED));
       }
@@ -1707,10 +1799,8 @@
       block.setAttribute(QUOTED_ATTR, nameKey(qtScreenName));
 
       if (!hasOwnContainer(targetRow)) {
-        const buttons = createButtons(qtScreenName, null);
+        const buttons = createButtons(qtScreenName);
         if (buttons) {
-          buttons._quotedBlock = block;
-
           // targetRow〜block間の祖先コンテナを広げて全幅にする
           let ancestor = targetRow;
           while (ancestor && ancestor !== block) {
@@ -1730,7 +1820,7 @@
       // ブロック/ミュート済みユーザーの引用ツイートを自動非表示
       const blockedAction = primaryAction(getUserState(qtScreenName));
       if (blockedAction && !isViewingProfileTimeline(qtScreenName)) {
-        hideQuotedTweet(block, qtScreenName, blockedAction);
+        hideQuotedTweet(block, qtScreenName);
       }
     });
   }
@@ -1745,12 +1835,20 @@
       // data-testid は "<ユーザーID>-follow" 形式。値ごと印にしておくと、
       // X が同じDOMノードを別ユーザーに使い回したときに作り直せる
       const stamp = btn.getAttribute('data-testid') || '1';
-      if (btn.getAttribute(PROCESSED) === stamp) return;
 
-      if (btn.closest('article[data-testid="tweet"]')) {
+      // 狭い画面では X がヘッダーに Follow ボタンを足し、そのとき caret/grok を
+      // 1段内側の行に包み直す。先に入れたボタンは外側の行（align-items:start,
+      // 高さ40px）に取り残されて 6px 浮くので、置き場所と並び順をここで保つ。
+      // X は後からこの行を作り直して並べ替えるので、印が付いていても毎回見る
+      const ownerTweet = btn.closest('article[data-testid="tweet"]');
+      if (ownerTweet) {
+        const isNew = btn.getAttribute(PROCESSED) !== stamp;
         btn.setAttribute(PROCESSED, stamp);
+        fixHeaderPlacement(ownerTweet, btn, isNew);
         return;
       }
+
+      if (btn.getAttribute(PROCESSED) === stamp) return;
 
       const hoverCard = btn.closest('[data-testid="HoverCard"]');
       const userCell = btn.closest('[data-testid="UserCell"]');
@@ -1772,14 +1870,14 @@
       }
       if (!screenName) {
         // 描画途中で名前が取れないことがあるので数回は再試行し、それ以上は打ち切る
-        const tries = Number(btn.getAttribute(RETRY_ATTR) || 0) + 1;
-        if (tries >= MAX_TWEET_RETRIES) btn.setAttribute(PROCESSED, stamp);
-        else btn.setAttribute(RETRY_ATTR, String(tries));
+        if (!countRetry(btn)) btn.setAttribute(PROCESSED, stamp);
         return;
       }
-      btn.removeAttribute(RETRY_ATTR);
       btn.setAttribute(PROCESSED, stamp);
-      if (isMe(screenName)) return;
+      if (isMe(screenName)) {
+        btn.removeAttribute(RETRY_ATTR);
+        return;
+      }
 
       let targetRow = null;
       let startNode = isProfile ? placement.parentElement : btn.parentElement;
@@ -1793,6 +1891,8 @@
         startNode = startNode.parentElement;
       }
       if (!targetRow) {
+        // 後から flex 行になることがあるので数回は待つが、無限には試さない
+        if (!countRetry(btn)) return;
         btn.removeAttribute(PROCESSED);
         return;
       }
@@ -1803,9 +1903,12 @@
         if (child.contains(btn)) { followChild = child; break; }
       }
       if (!followChild) {
+        if (!countRetry(btn)) return;
         btn.removeAttribute(PROCESSED);
         return;
       }
+      // ここまで来たら行は確定した。次に作り直されたときのために数え直す
+      btn.removeAttribute(RETRY_ATTR);
 
       // 重複防止: この「単位」の中のコンテナは1つに畳む。
       // X は再レンダリングでFollowボタンのネスト段数を変えることがあり、
@@ -1825,7 +1928,7 @@
 
       let buttons = reuse;
       if (!buttons) {
-        buttons = createButtons(screenName, null);
+        buttons = createButtons(screenName);
         if (!buttons) return;
       }
       buttons.classList.remove('twblock-profile', 'twblock-sidebar', 'twblock-hovercard');
@@ -1847,10 +1950,18 @@
     );
 
     items.forEach((item) => {
-      if (!item.querySelector('img')) return; // ユーザー項目のみ（検索クエリは除外）
+      // ユーザー項目のみ（検索クエリは除外）。描画途中もあるので数回は再試行する
+      if (!item.querySelector('img')) {
+        if (!countRetry(item)) item.setAttribute(PROCESSED, '1');
+        return;
+      }
 
       const screenName = extractScreenName(item);
-      if (!screenName) return;
+      if (!screenName) {
+        if (!countRetry(item)) item.setAttribute(PROCESSED, '1');
+        return;
+      }
+      item.removeAttribute(RETRY_ATTR);
       item.setAttribute(PROCESSED, '1');
       if (isMe(screenName)) return;
 
@@ -1862,7 +1973,7 @@
       const row = textArea.children[0];
       if (!row || row.querySelector('.twblock-btn-container')) return;
 
-      const buttons = createButtons(screenName, null);
+      const buttons = createButtons(screenName);
       if (!buttons) return;
       buttons.classList.add('twblock-typeahead');
 
@@ -1896,33 +2007,61 @@
 
   // ---- メイン処理 ----
   function processAll() {
+    lastPassAt = now();
     try { processTweets(); } catch (err) { console.warn('[twblock] processTweets', err); }
     try { processFollowButtons(); } catch (err) { console.warn('[twblock] processFollowButtons', err); }
     try { processTypeahead(); } catch (err) { console.warn('[twblock] processTypeahead', err); }
-    try { reapplyCollapsed(); } catch (err) { console.warn('[twblock] reapplyCollapsed', err); }
+    // 描画途中で取れなかった要素は、次の変化を待たずに自分で拾い直す。
+    // （以前は X が出し続ける無関係な変化がフォールバックを兼ねていた）
+    if (document.querySelector('[' + RETRY_ATTR + ']')) schedulePass(RETRY_PASS_DELAY);
   }
 
-  // 畳んだ要素に後から子が足される（画像の遅延ロード等）と、その子だけ表示されてしまう
-  function reapplyCollapsed() {
-    document.querySelectorAll('[' + COLLAPSED_ATTR + ']').forEach((el) => {
-      setChildrenHidden(el, true);
-    });
+  // ---- 変化の取捨とパスの間引き ----
+  // X はいいね数のアニメーション（span[app-text-transition-container]）だけで
+  // 1秒に200回近く childList を動かす。全部に反応すると processAll が毎フレーム走り、
+  // その仕事がキー入力と同じフレームに乗る。実測: 何もしていない画面で 44回/秒。
+  // 仕事があるのは「data-testid を持つ要素が増えた」ときだけなので、そこで切る。
+  function isRelevant(records) {
+    for (let i = 0; i < records.length; i++) {
+      const added = records[i].addedNodes;
+      for (let j = 0; j < added.length; j++) {
+        const node = added[j];
+        if (node.nodeType !== 1) continue;
+        if (node.hasAttribute('data-testid')) return true;
+        if (node.firstElementChild && node.querySelector('[data-testid]')) return true;
+      }
+    }
+    return false;
   }
 
+  const MIN_PASS_INTERVAL = 100;
+  const RETRY_PASS_DELAY = 250;
+  const now = () => (window.performance && performance.now ? performance.now() : Date.now());
   let rafScheduled = false;
   let trailingTimer = null;
-  const observer = new MutationObserver(() => {
-    // 次の描画フレームで即処理（ツイートと同フレームにボタン表示）
-    if (!rafScheduled) {
+  let lastPassAt = 0;
+
+  function schedulePass(minDelay) {
+    if (rafScheduled || trailingTimer) return;
+    const wait = Math.max(MIN_PASS_INTERVAL - (now() - lastPassAt), minDelay || 0);
+    if (wait <= 0) {
+      // 直前に走っていなければ次の描画フレームで即処理（ツイートと同フレームにボタン表示）
       rafScheduled = true;
       requestAnimationFrame(() => {
         rafScheduled = false;
         processAll();
       });
+      return;
     }
-    // rAF時点で未完成だった要素を拾うフォールバック
-    if (trailingTimer) clearTimeout(trailingTimer);
-    trailingTimer = setTimeout(processAll, 200);
+    trailingTimer = setTimeout(() => {
+      trailingTimer = null;
+      processAll();
+    }, wait);
+  }
+
+  const observer = new MutationObserver((records) => {
+    if (!isRelevant(records)) return;
+    schedulePass(0);
   });
 
   let lastUrl = location.href;
@@ -1949,7 +2088,7 @@
     if (changes.settings) {
       applySettings(changes.settings.newValue);
       // 言語が変わっていれば表を読み直してから作り直す
-      applyLocale(false).then(() => rescanAll());
+      applyLocale().then(() => rescanAll());
     }
     if (changes.icons) {
       const newIcons = changes.icons.newValue || {};
@@ -1992,7 +2131,7 @@
     await loadStoredIcons();
     await loadSettings();
     // 文言は設定を読んだ後に決める（Xの言語に合わせる設定があるため）
-    await applyLocale(false);
+    await applyLocale();
     await loadStoredAccentColor();
     await loadBlockedUsers();
     setTimeout(processAll, 300);
