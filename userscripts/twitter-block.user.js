@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Ultimate Twitter Block
 // @namespace    twitter-block-userscript
-// @version      2.3.7
+// @version      2.3.8
 // @description  Add one-click block/mute buttons to tweets, profiles, and search suggestions on Twitter/X
 // @author       nemut.ai
 // @match        https://x.com/*
@@ -1922,12 +1922,22 @@
     return keep;
   }
 
-  // 位置の検算用。getComputedStyle を使わずに grok/caret だけ拾う
-  function findGrokRowLite(tweet) {
-    return {
-      grokBtn: tweet.querySelector('[aria-label^="Grok"]'),
-      caret: tweet.querySelector('[data-testid="caret"]'),
-    };
+  // Follow と caret の両方を含む一番内側の要素＝X が組み替えた後の実際の行。
+  // getComputedStyle を使わないので毎パス見てよい
+  function headerRowOf(tweet, followBtn) {
+    const caret = tweet.querySelector('[data-testid="caret"]');
+    if (!caret) return null;
+    let node = followBtn.parentElement;
+    while (node && !node.contains(caret)) node = node.parentElement;
+    return node;
+  }
+
+  // row の直下の子のうち、node を含むもの
+  function childContaining(row, node) {
+    for (const child of row.children) {
+      if (child.contains(node)) return child;
+    }
+    return null;
   }
 
   // ヘッダーに Follow ボタンが出ている記事の後始末。
@@ -1940,17 +1950,28 @@
     const placed = ownHeaderContainer(tweet);
     if (!placed) return;
 
-    const anchorNode = headerAnchorNode(placed.parentElement, findGrokRowLite(tweet));
-    const next = placed.nextElementSibling;
-    const ordered = Boolean(anchorNode && next && next.contains(anchorNode));
-    if (isNew || !ordered) {
+    // TL から遷移すると、X はこちらを入れた後で行をもう1段深く包み直す。
+    // Follow ボタンは作り直されない（isNew が立たない）ので、毎パス見て直す。
+    // 「次の兄弟が Follow を含むか」だけで見ると、外側の行に取り残されていても
+    // 内側の行が Follow を含むので正しいと誤認する。行そのものを突き合わせる
+    const row = headerRowOf(tweet, followBtn);
+    const followChild = row && childContaining(row, followBtn);
+    let moved = false;
+    if (followChild) {
+      if (placed.parentElement !== row || placed.nextElementSibling !== followChild) {
+        row.insertBefore(placed, followChild);
+        moved = true;
+      }
+    } else {
+      // caret が無い等の想定外。従来の経路に落とす
       const info = findGrokRow(tweet);
       if (info) placeTweetButtons(info, placed);
+      moved = true;
     }
 
-    // 作り直された回も読み直す。Follow→Following で色が変わるし、
-    // 画面の向きが変わると次の大きさも変わる
-    if (isNew || !placed.style.getPropertyValue('--twblock-follow-tone')) {
+    // 作り直された回と、行が変わった回は読み直す。Follow→Following で色が変わるし、
+    // 包み直された先では大きさも変わりうる
+    if (isNew || moved || !placed.style.getPropertyValue('--twblock-follow-tone')) {
       // Follow は塗り、Following は輪郭なので、塗りがあれば背景色・無ければ文字色を借りる
       const cs = getComputedStyle(followBtn);
       const tone = isTransparentColor(cs.backgroundColor) ? cs.color : cs.backgroundColor;

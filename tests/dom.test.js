@@ -924,6 +924,45 @@ function check(name, ok, detail) {
     check('狭い画面: 戻した後も二重にならない', order.count === 1, `got ${order.count}`);
 
     // ---------------------------------------------------------------
+    // TL から遷移したとき: X はこちらが入れた後で行をもう1段深く包み直す。
+    // Follow ボタン自体は作り直されない（data-testid が変わらない＝isNew が立たない）ので、
+    // 「作り直された回だけ入れ直す」実装だと外側の行に取り残されたままになる。
+    // リロードでは最初から最終形なので気づけない
+    // ---------------------------------------------------------------
+    await page.evaluate(() => {
+      const art = document.querySelector('article[data-testid="tweet"]');
+      const outer = art.querySelector('.twblock-btn-container').parentElement;
+      const deeper = document.createElement('div');
+      deeper.className = 'row';
+      // Follow / grok / caret だけを1段内側へ移す。こちらのボタンは外側に残る
+      [...outer.children].forEach((child) => {
+        if (child.querySelector('[data-testid$="-follow"], [aria-label^="Grok"], [data-testid="caret"]')) {
+          deeper.appendChild(child);
+        }
+      });
+      outer.style.alignItems = 'flex-start';
+      outer.style.minHeight = '40px';
+      outer.appendChild(deeper);
+    });
+    await page.evaluate(() => new Promise((r) => setTimeout(r, 800)));
+    const moved = await page.evaluate(() => {
+      const art = document.querySelector('article[data-testid="tweet"]');
+      const cont = art.querySelector('.twblock-btn-container');
+      const follow = art.querySelector('[data-testid$="-follow"]');
+      const mid = (el) => { const r = el.getBoundingClientRect(); return r.top + r.height / 2; };
+      return {
+        count: art.querySelectorAll('.twblock-btn-container').length,
+        sameRow: cont.parentElement === follow.parentElement.parentElement,
+        beforeFollow: Boolean(cont.nextElementSibling && cont.nextElementSibling.contains(follow)),
+        gap: Math.abs(mid(cont) - mid(follow)),
+      };
+    });
+    check('TL遷移: 後から包み直されても Follow と同じ行に入り直す', moved.sameRow, JSON.stringify(moved));
+    check('TL遷移: Follow の直前に戻る', moved.beforeFollow, JSON.stringify(moved));
+    check('TL遷移: 入れ直しても二重にならない', moved.count === 1, JSON.stringify(moved));
+    check('TL遷移: Follow と中心が揃う', moved.gap <= 1, `ずれ ${moved.gap}px`);
+
+    // ---------------------------------------------------------------
     // 丸で囲うのは Follow が 32px の pill のときだけ。
     // スマホの X は同じボタンを 24px で出すので、そこに 32px の丸を付けると
     // grok や ⋯ より大きい輪になり、上揃えの行では 4px 下にはみ出す（iPhone実測）
