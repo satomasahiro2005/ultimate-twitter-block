@@ -46,13 +46,23 @@
   margin: -16px -14px;
 }
 
-/* 狭い画面ではヘッダーに Follow ボタン（高さ32pxの丸いピル）が出る。
-   そのときだけ、X のボタンと釣り合うように丸で囲う */
+/* 狭い画面ではヘッダーに Follow ボタンが出る。この行は上揃えのことがあり
+   （iPhone 実測）、背の高いものだけが下にはみ出す。行の揃え方に関係なく、
+   Follow や caret と中心を合わせる */
 div:has([data-testid$="-follow"], [data-testid$="-unfollow"]) > .twblock-btn-container.twblock-tweet:not(.twblock-repost) {
+  align-self: center;
+}
+
+/* Follow が 32px の pill で出るとき（PCの狭い窓）だけ、X のボタンと釣り合うように丸で囲う。
+   スマホの Follow は 24px で、そこに 32px の丸を付けると grok や ⋯ より大きい輪になり、
+   しかも上揃えの行で 4px 下にはみ出す。だから小さいときは素のアイコンのままにする。
+   pill かどうかは content.js が判定して .twblock-pill を付ける。
+   :has() も残してあるので、窓を広げて Follow が消えれば印が残っていても丸は消える */
+div:has([data-testid$="-follow"], [data-testid$="-unfollow"]) > .twblock-btn-container.twblock-tweet.twblock-pill:not(.twblock-repost) {
   gap: 6px;
 }
 
-div:has([data-testid$="-follow"], [data-testid$="-unfollow"]) > .twblock-btn-container.twblock-tweet:not(.twblock-repost) .twblock-btn {
+div:has([data-testid$="-follow"], [data-testid$="-unfollow"]) > .twblock-btn-container.twblock-tweet.twblock-pill:not(.twblock-repost) .twblock-btn {
   width: 32px;
   height: 32px;
   /* 輪郭だけ Follow ボタンの色を薄く借りる。アイコン自体は caret や ⋯ と同じ灰色のまま
@@ -61,14 +71,16 @@ div:has([data-testid$="-follow"], [data-testid$="-unfollow"]) > .twblock-btn-con
   border-radius: 9999px;
 }
 
-div:has([data-testid$="-follow"], [data-testid$="-unfollow"]) > .twblock-btn-container.twblock-tweet:not(.twblock-repost) .twblock-btn::before {
+/* ホバーの丸も同じ大きさに。margin は直径の半分（既定の -17px は 34px 用） */
+div:has([data-testid$="-follow"], [data-testid$="-unfollow"]) > .twblock-btn-container.twblock-tweet.twblock-pill:not(.twblock-repost) .twblock-btn::before {
   width: 32px;
   height: 32px;
+  margin: -16px;
 }
 
 /* この行では X の caret や ⋯ が白なので、アイコンもそれに合わせる（行から継承する）。
    :not(:hover) にしてあるのは、ホバー時の赤/青を上書きしないため */
-div:has([data-testid$="-follow"], [data-testid$="-unfollow"]) > .twblock-btn-container.twblock-tweet:not(.twblock-repost) .twblock-btn:not(:hover) {
+div:has([data-testid$="-follow"], [data-testid$="-unfollow"]) > .twblock-btn-container.twblock-tweet.twblock-pill:not(.twblock-repost) .twblock-btn:not(:hover) {
   color: inherit;
 }
 

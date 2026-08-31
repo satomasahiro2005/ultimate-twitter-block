@@ -1663,11 +1663,21 @@
       if (info) placeTweetButtons(info, placed);
     }
 
-    if (!placed.style.getPropertyValue('--twblock-follow-tone')) {
+    // 作り直された回も読み直す。Follow→Following で色が変わるし、
+    // 画面の向きが変わると次の大きさも変わる
+    if (isNew || !placed.style.getPropertyValue('--twblock-follow-tone')) {
       // Follow は塗り、Following は輪郭なので、塗りがあれば背景色・無ければ文字色を借りる
       const cs = getComputedStyle(followBtn);
       const tone = isTransparentColor(cs.backgroundColor) ? cs.color : cs.backgroundColor;
       if (tone) placed.style.setProperty('--twblock-follow-tone', tone);
+      // 同じ getComputedStyle から大きさも見る。PC の狭い窓の Follow は 32px の
+      // pill だが、スマホでは 24px で出る。24px に丸を付けると X の grok や ⋯ より
+      // 大きい輪ができるので、pill のときだけ丸で囲う。
+      // min-height は指定値なのでレイアウトを起こさない。X が置いていないときだけ
+      // height を読む
+      const minH = parseFloat(cs.minHeight);
+      const height = minH > 0 ? minH : parseFloat(cs.height);
+      placed.classList.toggle('twblock-pill', height >= 30);
     }
   }
 

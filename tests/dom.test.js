@@ -923,6 +923,60 @@ function check(name, ok, detail) {
     check('狭い画面: 並べ替えられても Follow の直前に戻る', order.beforeFollow, JSON.stringify(order));
     check('狭い画面: 戻した後も二重にならない', order.count === 1, `got ${order.count}`);
 
+    // ---------------------------------------------------------------
+    // 丸で囲うのは Follow が 32px の pill のときだけ。
+    // スマホの X は同じボタンを 24px で出すので、そこに 32px の丸を付けると
+    // grok や ⋯ より大きい輪になり、上揃えの行では 4px 下にはみ出す（iPhone実測）
+    // ---------------------------------------------------------------
+    await page.addStyleTag({ path: path.join(ROOT, 'styles.css') });
+    const headerLook = async (followStyle) => {
+      await page.evaluate((style) => {
+        const inner = [...document.querySelectorAll('article .row')].find((r) => r.querySelector('[aria-label^="Grok"]'));
+        inner.style.alignItems = 'flex-start';
+        const wrap = document.querySelector('article [data-testid$="-follow"], article [data-testid$="-unfollow"]').parentElement;
+        // X の作り直しを模す（data-testid ごと作り直すと isNew が立つ）
+        wrap.innerHTML = '<button data-testid="77-follow" style="' + style + '">Follow</button>';
+      }, followStyle);
+      await page.evaluate(() => new Promise((r) => setTimeout(r, 600)));
+      return page.evaluate(() => {
+        const art = document.querySelector('article[data-testid="tweet"]');
+        const cont = art.querySelector('.twblock-btn-container');
+        const btn = cont.querySelector('.twblock-btn');
+        const follow = art.querySelector('[data-testid$="-follow"]');
+        const mid = (el) => { const r = el.getBoundingClientRect(); return r.top + r.height / 2; };
+        return {
+          pill: cont.classList.contains('twblock-pill'),
+          size: btn.getBoundingClientRect().height,
+          border: getComputedStyle(btn).borderTopStyle,
+          gap: Math.abs(mid(cont) - mid(follow)),
+        };
+      });
+    };
+
+    const phone = await headerLook('min-height:24px;height:24px;padding:0 16px');
+    check('スマホ(24px): 丸で囲わない', phone.pill === false && phone.border === 'none', JSON.stringify(phone));
+    check('スマホ(24px): 従来どおり20pxのアイコン', phone.size === 20, JSON.stringify(phone));
+    check('スマホ(24px): 上揃えの行でも Follow と中心が揃う', phone.gap <= 1, `ずれ ${phone.gap}px`);
+
+    const pc = await headerLook('min-height:32px;height:32px;padding:0 16px');
+    check('PC狭い窓(32px): 丸で囲う', pc.pill === true && pc.border === 'solid', JSON.stringify(pc));
+    check('PC狭い窓(32px): Follow と同じ 32px', pc.size === 32, JSON.stringify(pc));
+    check('PC狭い窓(32px): 中心が揃う', pc.gap <= 1, `ずれ ${pc.gap}px`);
+
+    // 窓を広げて Follow が消えたら、印が残っていても丸は消える（:has() が外れる）
+    const widened = await page.evaluate(() => {
+      const art = document.querySelector('article[data-testid="tweet"]');
+      art.querySelector('[data-testid$="-follow"]').remove();
+      const cont = art.querySelector('.twblock-btn-container');
+      const btn = cont.querySelector('.twblock-btn');
+      return {
+        stillStamped: cont.classList.contains('twblock-pill'),
+        border: getComputedStyle(btn).borderTopStyle,
+        size: btn.getBoundingClientRect().height,
+      };
+    });
+    check('窓を広げたら丸は自分で消える', widened.border === 'none' && widened.size === 20, JSON.stringify(widened));
+
 
   } finally {
     await browser.close();
