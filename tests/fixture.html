@@ -228,6 +228,53 @@ window.addLateProfileButton = function () {
   return true;
 };
 
+// ホバーカード（ツイート内のメンションをホバーすると出るやつ）。
+// 実DOMから採寸: 行は align-items:stretch / justify-content:space-between で、
+// 高さは 64px のアバターが決める。Followボタンは 36px で、その 64px の箱の
+// 上端に置かれる（中央ではない）。ここを center 揃えのまま置くと 14px 下にずれる
+window.buildHoverCard = function (screenName, opts) {
+  opts = opts || {};
+  const card = document.createElement('div');
+  card.setAttribute('data-testid', 'HoverCard');
+  card.style.width = '300px';
+
+  const row = document.createElement('div');
+  row.style.display = 'flex';
+  row.style.flexDirection = 'row';
+  row.style.alignItems = 'stretch';
+  row.style.justifyContent = 'space-between';
+
+  const avatar = document.createElement('div');
+  avatar.style.width = '64px';
+  avatar.style.height = '64px';
+  avatar.style.borderRadius = '50%';
+  avatar.style.background = '#555';
+  row.appendChild(avatar);
+
+  const followWrap = document.createElement('div');
+  const btn = document.createElement('button');
+  btn.setAttribute('data-testid', (opts.testid || '9001-follow'));
+  btn.textContent = opts.label || 'Follow';
+  // X は 36px の pill を箱の上端に置く
+  btn.style.minHeight = '36px';
+  btn.style.height = '36px';
+  btn.style.padding = '0 16px';
+  followWrap.appendChild(btn);
+  row.appendChild(followWrap);
+
+  card.appendChild(row);
+
+  const name = document.createElement('a');
+  name.setAttribute('role', 'link');
+  name.setAttribute('href', '/' + screenName);
+  name.textContent = screenName;
+  card.appendChild(name);
+  const handle = document.createElement('span');
+  handle.textContent = '@' + screenName;
+  card.appendChild(handle);
+  return card;
+};
+
 window.reset = function () {
   document.getElementById('root').textContent = '';
 };

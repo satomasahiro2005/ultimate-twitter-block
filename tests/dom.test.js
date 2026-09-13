@@ -1016,6 +1016,36 @@ function check(name, ok, detail) {
     });
     check('窓を広げたら丸は自分で消える', widened.border === 'none' && widened.size === 20, JSON.stringify(widened));
 
+    // ---------------------------------------------------------------
+    // ホバーカード: メンションをホバーすると出るカード。
+    // 行は align-items:stretch で高さを 64px のアバターが決め、Followボタン(36px)は
+    // その上端に置かれる。共通の center 揃えのままだと自分のボタンだけ 14px 下に落ちる
+    // ---------------------------------------------------------------
+    await page.evaluate(() => {
+      window.reset();
+      const layers = document.getElementById('layers');
+      layers.textContent = '';
+      layers.appendChild(window.buildHoverCard('carol', { testid: '9001-follow' }));
+    });
+    await page.evaluate(() => new Promise((r) => setTimeout(r, 400)));
+
+    const hover = await page.evaluate(() => {
+      const card = document.querySelector('[data-testid="HoverCard"]');
+      const cont = card.querySelector('.twblock-btn-container');
+      if (!cont) return { missing: true };
+      const follow = card.querySelector('[data-testid$="-follow"]');
+      const mid = (el) => { const r = el.getBoundingClientRect(); return r.top + r.height / 2; };
+      return {
+        count: card.querySelectorAll('.twblock-btn-container').length,
+        tagged: cont.classList.contains('twblock-hovercard'),
+        gap: Math.abs(mid(cont.querySelector('.twblock-btn')) - mid(follow)),
+        beforeFollow: cont.nextElementSibling === follow.parentElement,
+      };
+    });
+    check('ホバーカード: コンテナが1つ入る', hover.count === 1 && hover.tagged, JSON.stringify(hover));
+    check('ホバーカード: Follow の直前に置かれる', hover.beforeFollow === true, JSON.stringify(hover));
+    check('ホバーカード: Follow と中心が揃う', hover.gap <= 1, `ずれ ${hover.gap}px`);
+
 
   } finally {
     await browser.close();

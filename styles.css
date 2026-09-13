@@ -233,6 +233,15 @@ div:has([data-testid$="-follow"], [data-testid$="-unfollow"]) > .twblock-btn-con
   margin-left: 8px !important;
 }
 
+/* ホバーカードの行は 64px のアバターが高さを決めていて align-items: stretch。
+   X の Followボタン(36px)はその箱の上端に置かれるので、共通の center 揃えの
+   ままだと自分のボタンだけ 14px 下にずれる（実測: 中心 719 対 705）。
+   X と同じく上端に寄せ、36pxのpillと32pxの丸の差 (36-32)/2 を足して中心を揃える */
+.twblock-btn-container.twblock-hovercard {
+  align-items: flex-start;
+  padding-top: 2px;
+}
+
 
 /* 個別ボタン（デフォルト: 34x34, アイコン20x20） */
 .twblock-btn {
