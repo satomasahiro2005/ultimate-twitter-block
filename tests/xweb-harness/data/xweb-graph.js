@@ -26,7 +26,34 @@
     const tweets = {};
     const viewerId = model.viewerId;
     const lists = model.lists || {};
-    const listsOf = (id) => Object.assign({}, lists, (model.userLists && model.userLists[id]) || {});
+    // Fixtures share one set of lists as defaults; live data (strictLists) never borrows
+    // another user's list.
+    const strict = Boolean(model.strictLists);
+    const listsOf = (id) => (strict
+      ? ((model.userLists && model.userLists[id]) || {})
+      : Object.assign({}, lists, (model.userLists && model.userLists[id]) || {}));
+
+    // Live mode: when the model lacks something, model.fetch(kind, args) loads it
+    // (read-only) and the answer waits for it. Fixtures have no fetch.
+    function fetchThen(kind, args, get) {
+      const have = get();
+      if (have != null) return have;
+      if (typeof model.fetch !== 'function') return undefined;
+      return Promise.resolve(model.fetch(kind, args)).then(get, (err) => {
+        (model.errors || (model.errors = [])).push(kind + ': ' + ((err && err.message) || err));
+        return undefined;
+      });
+    }
+    const then = (v, fn) => (v && typeof v.then === 'function' ? v.then(fn) : fn(v));
+    function connOf(name, get, toEntry, kind, args) {
+      return (a) => {
+        if (a.cursor != null) return timeline(name, [], a.cursor);
+        return then(fetchThen(kind, args, get), (list) => timeline(name, (list || []).map(toEntry).filter(Boolean), null));
+      };
+    }
+    function tweetKey(restId) {
+      return Object.keys(model.tweets).find((k) => model.tweets[k].id === restId && !model.tweets[k].retweetedById) || null;
+    }
 
     // ---------------------------------------------------------------- users
     function userResults(id) {
@@ -100,14 +127,14 @@
         },
       };
       // connection timelines (Following / Followers / profile posts)
-      const L = listsOf(id);
-      o.following_timeline = { __typename: 'Timeline', id: b64('FollowingTimeline:' + id), timeline: conn('following-' + id, L.following, userEntry) };
-      o.followers_timeline = { __typename: 'Timeline', id: b64('FollowersTimeline:' + id), timeline: conn('followers-' + id, L.followers, userEntry) };
-      o.blue_verified_followers_timeline = { __typename: 'Timeline', id: b64('VerifiedFollowersTimeline:' + id), timeline: conn('vfollowers-' + id, L.verifiedFollowers, userEntry) };
+      const L = (k) => () => listsOf(id)[k];
+      o.following_timeline = { __typename: 'Timeline', id: b64('FollowingTimeline:' + id), timeline: connOf('following-' + id, L('following'), userEntry, 'following', { userId: id }) };
+      o.followers_timeline = { __typename: 'Timeline', id: b64('FollowersTimeline:' + id), timeline: connOf('followers-' + id, L('followers'), userEntry, 'followers', { userId: id }) };
+      o.blue_verified_followers_timeline = { __typename: 'Timeline', id: b64('VerifiedFollowersTimeline:' + id), timeline: connOf('vfollowers-' + id, L('verifiedFollowers'), userEntry, 'verifiedFollowers', { userId: id }) };
       o.verified_followers_timeline = o.blue_verified_followers_timeline;
-      o.profile_user_originals_timeline = { __typename: 'Timeline', id: b64('Originals:' + id), timeline: conn('posts-' + id, L.profilePosts, tweetEntry) };
+      o.profile_user_originals_timeline = { __typename: 'Timeline', id: b64('Originals:' + id), timeline: connOf('posts-' + id, L('profilePosts'), tweetEntry, 'profilePosts', { userId: id }) };
       if (id === viewerId) {
-        o.notification_timeline = () => ({ __typename: 'Timeline', id: b64('Notifications:' + id), timeline: conn('notifications', model.notifications, notificationEntry) });
+        o.notification_timeline = () => ({ __typename: 'Timeline', id: b64('Notifications:' + id), timeline: connOf('notifications', () => model.notifications, notificationEntry, 'notifications', {}) });
       }
       return o;
     }
@@ -170,7 +197,7 @@
       if (t.retweetedById) {
         const origKey = key + ':orig';
         tweets[origKey] = tweetObject(Object.assign({}, t, { retweetedById: null }), origKey);
-        const w = tweetObject(Object.assign({}, t, { authorId: t.retweetedById, id: '8' + t.id.slice(1), text: 'RT', media: [], quotedId: null, replyToScreenName: null }), key);
+        const w = tweetObject(Object.assign({}, t, { authorId: t.retweetedById, id: t.repostId || ('8' + t.id.slice(1)), text: 'RT', media: [], quotedId: null, replyToScreenName: null }), key);
         w.legacy.retweeted_status_results = { __typename: 'TweetResults', id: b64('TweetResults:' + origKey), rest_id: t.id, result: tweets[origKey] };
         tweets[key] = w;
         return w;
@@ -293,41 +320,50 @@
     const viewerUser = viewerId ? userResults(viewerId) : null;
     const root = {
       __typename: 'Query',
-      user_result_by_screen_name: ({ screen_name }) => userResults(userBySn(screen_name)),
+      user_result_by_screen_name: ({ screen_name }) => then(fetchThen('user', { screenName: screen_name }, () => userBySn(screen_name)), userResults),
       user_result_by_rest_id: ({ rest_id }) => userResults(rest_id),
       user_results_by_rest_ids: ({ rest_ids }) => (rest_ids || []).map(userResults),
-      tweet_result_by_rest_id: ({ rest_id }) => tweetResults(Object.keys(model.tweets).find((k) => model.tweets[k].id === rest_id && !model.tweets[k].retweetedById) || rest_id),
+      tweet_result_by_rest_id: ({ rest_id }) => then(fetchThen('conversation', { tweetId: rest_id }, () => tweetKey(rest_id)), tweetResults),
       threaded_conversation_with_injections_v2: ({ focal_tweet_id, cursor }) => {
         if (cursor != null) return timeline('conversation-' + focal_tweet_id, [], cursor);
-        const focalKey = Object.keys(model.tweets).find((k) => model.tweets[k].id === focal_tweet_id);
-        const focal = tweetEntry(focalKey); // first: highest sort index, replies sort below it
-        return timeline('conversation-' + focal_tweet_id, [focal].concat((lists.conversation || []).map(conversationEntry)), cursor);
+        const replies = () => (strict ? (model.conversations || {})[focal_tweet_id] : lists.conversation);
+        return then(fetchThen('conversation', { tweetId: focal_tweet_id }, replies), (list) => {
+          const focal = tweetEntry(tweetKey(focal_tweet_id)); // first: highest sort index, replies sort below it
+          return timeline('conversation-' + focal_tweet_id, [focal].concat((list || []).map(conversationEntry)), cursor);
+        });
       },
-      home_timeline: { __typename: 'Timeline', id: b64('Home'), home_timeline_urt: conn('home', lists.home, tweetEntry), home_latest_timeline_urt: conn('home-latest', lists.home, tweetEntry) },
+      home_timeline: { __typename: 'Timeline', id: b64('Home'), home_timeline_urt: connOf('home', () => lists.home, tweetEntry, 'home', {}), home_latest_timeline_urt: connOf('home-latest', () => lists.home, tweetEntry, 'home', {}) },
       search_by_raw_query: ({ raw_query }) => ({
         __typename: 'SearchQuery', id: b64('Search:' + raw_query),
-        timeline: ({ product }) => ({
-          __typename: 'Timeline', id: b64('SearchTimeline:' + raw_query + ':' + product),
-          timeline: product === 'People'
-            ? conn('search-people', lists.searchPeople, userEntry)
-            : conn('search-' + product, lists.searchTop, tweetEntry),
-        }),
+        timeline: ({ product }) => {
+          const people = product === 'People';
+          const get = () => (strict ? (model.searches || {})[raw_query + '|' + product] : (people ? lists.searchPeople : lists.searchTop));
+          return {
+            __typename: 'Timeline', id: b64('SearchTimeline:' + raw_query + ':' + product),
+            timeline: connOf('search-' + product, get, people ? userEntry : tweetEntry, 'search', { query: raw_query, product }),
+          };
+        },
       }),
       viewer_v2: viewerId ? {
         __typename: 'Viewer',
         user_results: viewerUser,
-        blocking_timeline: { __typename: 'Timeline', id: b64('Blocking'), timeline: conn('blocked', lists.blocked, userEntry) },
-        muting_timeline: { __typename: 'Timeline', id: b64('Muting'), timeline: conn('muted', lists.muted, userEntry) },
+        blocking_timeline: { __typename: 'Timeline', id: b64('Blocking'), timeline: connOf('blocked', () => lists.blocked, userEntry, 'blocked', {}) },
+        muting_timeline: { __typename: 'Timeline', id: b64('Muting'), timeline: connOf('muted', () => lists.muted, userEntry, 'muted', {}) },
       } : null,
       viewer: viewerId ? { __typename: 'Viewer', user_results: viewerUser, claims: null, is_active_creator: false } : null,
-      connect_tab_timeline: { __typename: 'Timeline', id: b64('Connect'), timeline: conn('connect', lists.whoToFollow, userEntry) },
+      connect_tab_timeline: { __typename: 'Timeline', id: b64('Connect'), timeline: connOf('connect', () => lists.whoToFollow, userEntry, 'whoToFollow', {}) },
       // logged-in right sidebar: a "Who to follow" module
-      explore_sidebar: { __typename: 'Timeline', id: b64('ExploreSidebar'), timeline: (args) => timeline('sidebar', args.cursor == null && viewerId && lists.whoToFollow ? [whoToFollowEntry(lists.whoToFollow)] : [], args.cursor) },
+      explore_sidebar: {
+        __typename: 'Timeline', id: b64('ExploreSidebar'),
+        timeline: (args) => (args.cursor != null || !viewerId
+          ? timeline('sidebar', [], args.cursor)
+          : then(fetchThen('whoToFollow', {}, () => lists.whoToFollow), (ids) => timeline('sidebar', ids && ids.length ? [whoToFollowEntry(ids.slice(0, 3))] : [], null))),
+      },
       pinned_timelines: { __typename: 'PinnedTimelines', pinned_timelines: [] },
       can_access_payments: false,
       xpayments_enrolled: false,
     };
-    return { root, user, tweet, userResults, tweetResults, timeline, conn, userEntry, tweetEntry };
+    return { root, user, tweet, userResults, tweetResults, timeline, conn, connOf, userEntry, tweetEntry };
   }
 
   // The viewer object x-web's ViewerProvider takes (see xweb/entry.js)

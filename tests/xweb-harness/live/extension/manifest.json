@@ -1,0 +1,16 @@
+{
+  "manifest_version": 3,
+  "name": "x-web harness (live, dev)",
+  "version": "0.2.0",
+  "description": "Dev tool for Ultimate Twitter Block: shows a logged-in x.com tab in X's x-web client, with your own data read through the classic app. Toolbar button toggles it per tab.",
+  "permissions": ["scripting", "declarativeNetRequest", "storage", "tabs"],
+  "host_permissions": ["https://x.com/*"],
+  "background": { "service_worker": "background.js" },
+  "action": { "default_title": "x-web harness: switch this tab to x-web / back" },
+  "content_scripts": [
+    { "matches": ["https://x.com/*"], "js": ["page/tap.js"], "run_at": "document_start", "world": "MAIN" }
+  ],
+  "web_accessible_resources": [
+    { "resources": ["xweb/*"], "matches": ["https://x.com/*"] }
+  ]
+}

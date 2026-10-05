@@ -18,6 +18,7 @@
   RT.misses = RT.misses || {};    // "Type.field" -> count, for filling in the graph
   RT.served = RT.served || [];    // [{ name, variables, ms }]
   RT.log = RT.log || [];
+  RT.pending = RT.pending || 0;   // GraphQL requests being answered (live reads can take a while)
 
   // ------------------------------------------------------------ AST capture
   function register(node) {
@@ -97,14 +98,15 @@
     return v;
   }
 
-  function walk(selections, src, vars, out, typename, path, ctx) {
+  // Graph values may be Promises (live mode fetches on demand): everything awaits.
+  async function walk(selections, src, vars, out, typename, path, ctx) {
     for (const sel of selections || []) {
       switch (sel.kind) {
         case 'ScalarField': {
           const key = sel.alias || sel.name;
           if (key in out && out[key] != null) break;
           if (sel.name === '__typename') { out[key] = typeOf(src, typename); break; }
-          let v = readField(src, sel, vars, ctx);
+          let v = await readField(src, sel, vars, ctx);
           if (v === undefined && sel.name === 'id') v = (typename || 'Node') + ':xwh:' + hashPath(path);
           if (v === undefined) { miss(typename, sel.name); v = null; }
           out[key] = v;
@@ -112,25 +114,33 @@
         }
         case 'LinkedField': {
           const key = sel.alias || sel.name;
-          const v = readField(src, sel, vars, ctx);
+          const v = await readField(src, sel, vars, ctx);
           const sub = path + '.' + key + (sel.args ? JSON.stringify(argsOf(sel, vars)) : '');
           if (v == null) {
             if (v === undefined) miss(typename, sel.name);
             if (!(key in out)) out[key] = null;
             break;
           }
-          const one = (item, i) => {
+          const one = async (item, i) => {
+            item = await item;
             if (item == null) return null;
             const prev = sel.plural ? null : out[key];
             const o = prev && typeof prev === 'object' ? prev : {};
-            walk(sel.selections, item, vars, o, typeOf(item, sel.concreteType), sub + (i == null ? '' : '[' + i + ']'), ctx);
+            await walk(sel.selections, item, vars, o, typeOf(item, sel.concreteType), sub + (i == null ? '' : '[' + i + ']'), ctx);
             return o;
           };
-          out[key] = sel.plural ? (Array.isArray(v) ? v.map(one) : []) : one(v);
+          if (sel.plural) {
+            const list = Array.isArray(v) ? v : [];
+            const items = [];
+            for (let i = 0; i < list.length; i++) items.push(await one(list[i], i));
+            out[key] = items;
+          } else {
+            out[key] = await one(v);
+          }
           break;
         }
         case 'InlineFragment':
-          if (matches(src, sel.type, sel.abstractKey, typename)) walk(sel.selections, src, vars, out, typename, path, ctx);
+          if (matches(src, sel.type, sel.abstractKey, typename)) await walk(sel.selections, src, vars, out, typename, path, ctx);
           break;
         case 'FragmentSpread': {
           const frag = sel.fragment;
@@ -143,15 +153,15 @@
             (frag.argumentDefinitions || []).forEach((d) => { if (d.kind === 'LocalArgument' && !(d.name in v2)) v2[d.name] = d.defaultValue; });
             Object.assign(v2, argsOf(sel, vars));
           }
-          walk(frag.selections, src, v2, out, typename, path, ctx);
+          await walk(frag.selections, src, v2, out, typename, path, ctx);
           break;
         }
         case 'Condition':
-          if (Boolean(vars[sel.condition]) === sel.passingValue) walk(sel.selections, src, vars, out, typename, path, ctx);
+          if (Boolean(vars[sel.condition]) === sel.passingValue) await walk(sel.selections, src, vars, out, typename, path, ctx);
           break;
         case 'Defer':
         case 'Stream':
-          walk(sel.selections, src, vars, out, typename, path, ctx);
+          await walk(sel.selections, src, vars, out, typename, path, ctx);
           break;
         case 'TypeDiscriminator':
           if (sel.abstractKey) out[sel.abstractKey] = typeOf(src, typename);
@@ -161,10 +171,10 @@
         case 'RelayLiveResolver':
           // Client-side resolvers compute a field from server data: the data
           // they read (their root fragment) still has to come in the response.
-          if (sel.fragment && sel.fragment.selections) walk(sel.fragment.selections, src, vars, out, typename, path, ctx);
+          if (sel.fragment && sel.fragment.selections) await walk(sel.fragment.selections, src, vars, out, typename, path, ctx);
           break;
         case 'ClientEdgeToClientObject':
-          if (sel.backingField) walk([sel.backingField], src, vars, out, typename, path, ctx);
+          if (sel.backingField) await walk([sel.backingField], src, vars, out, typename, path, ctx);
           break;
         default:
           // LinkedHandle / ScalarHandle / ClientExtension / ModuleImport /
@@ -180,13 +190,13 @@
     RT.misses[k] = (RT.misses[k] || 0) + 1;
   }
 
-  RT.resolve = function resolve(node, variables) {
+  RT.resolve = async function resolve(node, variables) {
     const vars = Object.assign({}, variables);
     const pv = node.params && node.params.providedVariables;
     if (pv) Object.keys(pv).forEach((k) => { try { vars[k] = pv[k].get(); } catch (err) { vars[k] = null; } });
     const ctx = { node, vars, name: node.params && node.params.name };
     const root = typeof RT.root === 'function' ? RT.root(ctx) : (RT.root || {});
-    const data = walk(node.operation.selections, root, vars, {}, node.operation.kind === 'Operation' ? (node.params.operationKind === 'mutation' ? 'Mutation' : 'Query') : null, ctx.name, ctx);
+    const data = await walk(node.operation.selections, root, vars, {}, node.operation.kind === 'Operation' ? (node.params.operationKind === 'mutation' ? 'Mutation' : 'Query') : null, ctx.name, ctx);
     return { data };
   };
 
@@ -222,36 +232,44 @@
     if (SINK_HOSTS.test(u.hostname)) return jsonResponse({});
     const m = u.pathname.match(GQL_RE);
     if (m) {
-      const [, id, name] = m;
-      const t0 = Date.now();
-      const node = await waitForOp(name, id, 3000);
-      let variables = {};
+      RT.pending++;
       try {
-        if (init && init.body && typeof init.body === 'string') variables = JSON.parse(init.body).variables || {};
-        else variables = JSON.parse(u.searchParams.get('variables') || '{}');
-      } catch (err) { /* keep {} */ }
-      if (!node) {
-        RT.log.push('no AST for ' + name);
-        return jsonResponse({ errors: [{ message: 'xweb-harness: no AST for ' + name }] });
+        return await answer(m, u, init);
+      } finally {
+        RT.pending--;
       }
-      if (node.params.operationKind === 'mutation') {
-        // Never mutate anything. The UI gets an error like a failed request.
-        RT.log.push('refused mutation ' + name);
-        return jsonResponse({ errors: [{ message: 'xweb-harness: mutations are disabled' }] }, 200);
-      }
-      let body;
-      try { body = RT.resolve(node, variables); } catch (err) {
-        RT.log.push('resolve ' + name + ' failed: ' + (err && err.stack || err));
-        body = { errors: [{ message: String(err) }] };
-      }
-      RT.served.push({ name, variables, ms: Date.now() - t0 });
-      (RT.bodies || (RT.bodies = {}))[name + (RT.bodies[name] ? '#' + RT.served.length : '')] = body;
-      return jsonResponse(body);
     }
     for (const [re, fn] of CANNED) if (re.test(u.pathname)) return jsonResponse(fn(u));
-    RT.log.push('unhandled ' + (init && init.method || 'GET') + ' ' + u.href);
+    RT.log.push('unhandled ' + ((init && init.method) || 'GET') + ' ' + u.href);
     return jsonResponse({}, 404);
   };
+
+  async function answer(m, u, init) {
+    const [, id, name] = m;
+    const t0 = Date.now();
+    const node = await waitForOp(name, id, 3000);
+    let variables = {};
+    try {
+      if (init && init.body && typeof init.body === 'string') variables = JSON.parse(init.body).variables || {};
+      else variables = JSON.parse(u.searchParams.get('variables') || '{}');
+    } catch (err) { /* keep {} */ }
+    if (!node) {
+      RT.log.push('no AST for ' + name);
+      return jsonResponse({ errors: [{ message: 'xweb-harness: no AST for ' + name }] });
+    }
+    if (node.params.operationKind === 'mutation') {
+      // Never mutate anything. The UI gets an error like a failed request.
+      RT.log.push('refused mutation ' + name);
+      return jsonResponse({ errors: [{ message: 'xweb-harness: mutations are disabled' }] }, 200);
+    }
+    let body;
+    try { body = await RT.resolve(node, variables); } catch (err) {
+      RT.log.push('resolve ' + name + ' failed: ' + (err && err.stack || err));
+      body = { errors: [{ message: String(err) }] };
+    }
+    RT.served.push({ name, variables, ms: Date.now() - t0 });
+    return jsonResponse(body);
+  }
 
   RT.installFetch = function installFetch() {
     if (RT.fetchInstalled) return;

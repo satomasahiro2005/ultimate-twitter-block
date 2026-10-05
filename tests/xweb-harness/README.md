@@ -59,9 +59,39 @@ const { page } = await H.openShot(browser, 'following', { width: 420 });
 const report = await H.measure(page);
 ```
 
+## Live mode: your own account in x-web
+
+This mode shows a logged-in x.com tab in the real x-web client with your own data, so you can try the extension by hand on screens X doesn't serve you yet.
+
+```
+node tests/xweb-harness/fetch-assets.js     # once
+node tests/xweb-harness/live/build.js       # assembles live/extension (bundle + page scripts)
+```
+
+1. Go to `chrome://extensions` and choose "Load unpacked" for `tests/xweb-harness/live/extension`. Ultimate Twitter Block stays installed next to it.
+2. Use x.com as usual for a moment. The dev extension passively records the classic app's own GraphQL requests: the operation ids and features, plus the responses it already got.
+3. Click the dev extension's toolbar button on an x.com tab. It does four things:
+   - reads your profile through the classic app's operations
+   - holds back the classic app's scripts for that tab
+   - reloads the tab
+   - boots x-web from the bundle inside the dev extension
+
+   The badge shows `XW`. Navigate inside x-web as you like. When x-web asks for something not yet loaded (a Following list, a profile, notifications, a post), the page reads it through the classic operation and then answers.
+4. Click again to go back to the classic app.
+
+How live mode handles the network:
+- **Reads only.** Reads go to `x.com/i/api/graphql/...` with your tab's session, exactly as the classic app's do. Live mode never sends a GraphQL mutation. x-web's own mutations (like, follow from x-web's buttons) are answered with an error in the page and never sent.
+- **x-web's own traffic is blocked for that tab.** That covers `api.x.com`, Sentry, and the Google/Apple sign-in SDKs of its logged-out frame. x-web's GraphQL is answered in the page.
+- **The extension's buttons are real.** Ultimate Twitter Block's block/mute buttons call the real API when you click them.
+- **Service worker.** Switching on unregisters x.com's service worker so the reload comes from the network. x.com registers it again on its next normal load.
+
+If a screen says an operation is unknown ("open Notifications once in the classic UI"), the classic app hasn't made that request in this tab yet. Switch back, open that screen once, then switch again.
+
+`node tests/xweb-harness/live/selftest.js` tests all of this offline. It uses a fake classic x.com (`live/classic-fake.js` answers with classic-shaped responses built from the fixtures) and installs both extensions. It switches to x-web, navigates to Following, a profile and Notifications (each triggering its on-demand read), and switches back. It also checks that only reads were sent and that nothing went unserved.
+
 ## Limits
 
 - The bundle is pinned to build `d8a521fb` (2026-10-06). When X ships a new build, re-fetch it and update the file names and patches in `xweb/entry.js`. The patches fail loudly if they no longer match.
 - The page frame is x-web's logged-out frame, because the logged-in layout is staff-gated (see above). Left nav, account switcher and the logged-in phone top bar are therefore not shown.
-- The fake graph covers what these screens read. Video, cards, polls, Spaces, communities and lists are mostly `null`, and x-web renders them as missing.
+- The fake graph covers what these screens read (live mode fills the same graph from the classic app). Video, cards, polls, Spaces, communities and lists are mostly `null`, and x-web renders them as missing.
 - The logged-in DOM comes from x-web's own code running with fake data, not from a page X served to a logged-in account, because X does not serve one.

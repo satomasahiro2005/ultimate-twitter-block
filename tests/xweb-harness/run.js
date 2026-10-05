@@ -246,18 +246,28 @@ async function openPage(browser, urlPath, opts) {
   return { page, unserved, apiCalls, telemetry };
 }
 
-// Router settled, no GraphQL answered for 300ms, fonts loaded, then the
-// extension's passes (content script at document_idle, then rAF/timers).
+// Idle = the router has settled, no GraphQL request is being answered, none was
+// answered for 300ms, and the network (x-web's lazily loaded chunks, images) has
+// been quiet for 400ms; repeated until all hold at once. Then fonts.
 async function waitIdle(page, timeout) {
-  await page.waitForFunction(() => {
+  const until = Date.now() + timeout;
+  const rtIdle = () => page.waitForFunction(() => {
     const RT = window.XWH_RT;
     if (!RT || !RT.router) return false;
     const st = RT.router.state;
-    if (st.status !== 'idle' || st.isLoading) return false;
+    if (st.status !== 'idle' || st.isLoading || RT.pending > 0) return false;
     const n = RT.served.length;
     if (RT.__lastN !== n) { RT.__lastN = n; RT.__lastAt = performance.now(); return false; }
     return performance.now() - RT.__lastAt > 300;
-  }, { timeout, polling: 50 });
+  }, { timeout: Math.max(until - Date.now(), 1), polling: 50 });
+  for (;;) {
+    await rtIdle();
+    const before = await page.evaluate(() => window.XWH_RT.served.length);
+    await page.waitForNetworkIdle({ idleTime: 400, timeout: Math.max(until - Date.now(), 1) });
+    const again = await page.evaluate(() => ({ n: window.XWH_RT.served.length, pending: window.XWH_RT.pending }));
+    if (again.n === before && again.pending === 0) break;
+    if (Date.now() > until) throw new Error('waitIdle: page kept loading for ' + timeout + 'ms');
+  }
   await page.evaluate(() => document.fonts && document.fonts.ready);
 }
 
