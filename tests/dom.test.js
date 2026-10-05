@@ -22,6 +22,195 @@ function check(name, ok, detail) {
   console.log(`${ok ? 'PASS' : 'FAIL'}  ${name}${detail !== undefined && !ok ? '  -> ' + detail : ''}`);
 }
 
+// ---------------------------------------------------------------
+// ログイン中の x-web（まだ一般には配られていない画面）を本物で回す。
+// tests/xweb-harness が x-web 本体をオフラインで起動し、拡張（content.js そのもの）を
+// 入れた Chrome で開く。x-web のバンドルは .cache に要る（fetch-assets.js）。
+// 無ければスキップ（REQUIRE_XWEB=1 なら失敗）
+// ---------------------------------------------------------------
+async function xwebHarnessTests() {
+  let H;
+  try {
+    H = require('./xweb-harness/run.js');
+  } catch (err) {
+    console.log('SKIP x-web harness: ' + err.message);
+    return;
+  }
+  let browser;
+  try {
+    // XWEB_EXTENSION_PATH: 別のビルド（修正前など）で同じ確認を回す
+    browser = await H.launch({ extension: true, extensionPath: process.env.XWEB_EXTENSION_PATH || undefined });
+  } catch (err) {
+    if (process.env.REQUIRE_XWEB) { check('x-web harness: 起動できる', false, err.message); return; }
+    console.log('SKIP x-web harness: ' + err.message);
+    return;
+  }
+  try {
+    // 行ごとに: こちらのコンテナが Follow 系ボタンの直前の兄弟か、中心の高さが揃うか
+    const rowReport = (page, kind) => page.evaluate((cls) => {
+      const box = (el) => { const r = el.getBoundingClientRect(); return { top: r.top, bottom: r.bottom, cy: (r.top + r.bottom) / 2, left: r.left, right: r.right }; };
+      return [...document.querySelectorAll('.twblock-btn-container.' + cls)]
+        .filter((c) => c.getClientRects().length)
+        .map((c) => {
+          const next = c.nextElementSibling;
+          const a = box(c);
+          const b = next ? box(next) : null;
+          return {
+            name: c.getAttribute('data-screen-name'),
+            nextIsButton: Boolean(next && next.tagName === 'BUTTON'),
+            dy: b ? Math.round(a.cy - b.cy) : null,
+            gap: b ? Math.round(b.left - a.right) : null,
+            below: c.classList.contains('twblock-xweb-below'),
+            nextTop: b ? Math.round(b.top) : null,
+            top: Math.round(a.top),
+          };
+        });
+    }, kind);
+
+    // 1. フォロー一覧: 全行（自分以外）に Follow 系ボタンの左隣で、高さが揃う
+    for (const width of [1280, 420]) {
+      const { page } = await H.openShot(browser, 'following', { width });
+      const cells = await page.evaluate(() => [...document.querySelectorAll('main [data-timeline-entry][data-href]')]
+        .filter((e) => !e.querySelector('article')).map((e) => e.getAttribute('data-href').slice(1)));
+      const rows = await rowReport(page, 'twblock-xweb-user');
+      const inMain = await page.evaluate(() => [...document.querySelectorAll('main .twblock-btn-container')].map((c) => c.getAttribute('data-screen-name')));
+      check(`x-web フォロー一覧(${width}): 全ユーザー行にボタン`, cells.length === 8 && JSON.stringify(inMain) === JSON.stringify(cells),
+        JSON.stringify({ cells, inMain }));
+      const bad = rows.filter((r) => !r.nextIsButton || Math.abs(r.dy) > 1 || r.gap !== 8);
+      check(`x-web フォロー一覧(${width}): Follow の左隣 8px で中心が揃う`, rows.length >= 8 && bad.length === 0, JSON.stringify(bad));
+      await page.close();
+    }
+
+    // 2. ホーム: 自分の投稿には出さない（x-web は自分の名前を __INITIAL_DATA__ でだけ持つ）。
+    //    リポストは元の投稿を article で包み直すが、その「もっと見る」の左に出る
+    {
+      const { page } = await H.openShot(browser, 'home', { width: 420 });
+      const r = await page.evaluate(() => {
+        const entryOf = (needle) => [...document.querySelectorAll('[data-timeline-entry]')].find((e) => (e.getAttribute('data-href') || '').startsWith(needle));
+        const own = entryOf('/fake_me/status/');
+        const repost = entryOf('/fake_heidi/status/');
+        const more = repost && [...repost.querySelectorAll('svg[data-icon="icon-more"]')].map((s) => s.closest('button'))[0];
+        return {
+          own: own ? own.querySelectorAll('.twblock-btn-container').length : -1,
+          repost: Boolean(more && more.previousElementSibling && more.previousElementSibling.classList.contains('twblock-btn-container')),
+        };
+      });
+      check('x-web ホーム: 自分の投稿にはボタンを出さない', r.own === 0, JSON.stringify(r));
+      check('x-web ホーム: リポストの「もっと見る」の左に出る', r.repost, JSON.stringify(r));
+      await page.close();
+    }
+
+    // 3. プロフィール: 操作行の Follow の左。スマホ幅で入りきらないときは行の下へ回し、
+    //    X の [もっと見る][メッセージ][通知][Follow] は1行に残す
+    for (const width of [1280, 420]) {
+      const { page } = await H.openShot(browser, 'profile', { width });
+      const rows = await rowReport(page, 'twblock-xweb-profile');
+      const r = rows[0] || {};
+      const xwebOneLine = await page.evaluate(() => {
+        const c = document.querySelector('.twblock-xweb-profile');
+        if (!c) return false;
+        const tops = [...c.parentElement.children].filter((el) => el !== c).map((el) => Math.round(el.getBoundingClientRect().top));
+        return tops.every((t) => t === tops[0]);
+      });
+      if (width === 1280) {
+        check('x-web プロフィール(1280): Follow の左隣 8px で中心が揃う', rows.length === 1 && r.name === 'fake_alice' && r.nextIsButton && Math.abs(r.dy) <= 1 && r.gap === 8 && !r.below, JSON.stringify(rows));
+      } else {
+        check('x-web プロフィール(420): 入りきらないので行の下に回す', rows.length === 1 && r.below && r.top > r.nextTop, JSON.stringify(rows));
+      }
+      check(`x-web プロフィール(${width}): X のボタンは1行のまま`, xwebOneLine);
+      await page.close();
+    }
+
+    // 4. 自分のプロフィールには出さない
+    {
+      const { page } = await H.openShot(browser, 'profile-self', { width: 1280 });
+      const n = await page.evaluate(() => document.querySelectorAll('.twblock-btn-container').length);
+      check('x-web 自分のプロフィール: ボタンを出さない', n === 0, `got ${n}`);
+      await page.close();
+    }
+
+    // 5. ホバーカード: [こちら][メッセージ][Follow] の順で中心が揃う
+    {
+      const { page } = await H.openShot(browser, 'hovercard', { width: 1280 });
+      const r = await page.evaluate(() => {
+        const c = document.querySelector('[data-side] .twblock-btn-container.twblock-xweb-hover');
+        if (!c) return null;
+        const cy = (el) => { const b = el.getBoundingClientRect(); return (b.top + b.bottom) / 2; };
+        const sibs = [...c.parentElement.children];
+        return {
+          name: c.getAttribute('data-screen-name'),
+          first: sibs[0] === c,
+          rest: sibs.slice(1).map((el) => el.tagName),
+          dy: sibs.slice(1).map((el) => Math.round(cy(c) - cy(el))),
+        };
+      });
+      check('x-web ホバーカード: 操作の塊の先頭に出て中心が揃う',
+        r && r.name === 'fake_heidi' && r.first && r.rest.join() === 'BUTTON,BUTTON' && r.dy.every((d) => Math.abs(d) <= 2), JSON.stringify(r));
+      await page.close();
+    }
+
+    // 6. ブロック一覧（モーダル）: Blocked ボタンの左
+    {
+      const { page } = await H.openShot(browser, 'blocked', { width: 420 });
+      const rows = await page.evaluate(() => [...document.querySelectorAll('[role="dialog"] .twblock-btn-container, [data-open] .twblock-btn-container')]
+        .map((c) => ({ name: c.getAttribute('data-screen-name'), next: c.nextElementSibling && c.nextElementSibling.getAttribute('aria-label') })));
+      check('x-web ブロック一覧: Unblock ボタンの左に出る',
+        rows.length === 2 && rows.every((r) => r.next === 'Unblock @' + r.name), JSON.stringify(rows));
+      await page.close();
+    }
+
+    // 7. 通知: 「〇〇さんがフォロー/いいね」には出さず、返信・メンションの投稿には出す
+    {
+      const { page } = await H.openShot(browser, 'notifications', { width: 1280 });
+      const r = await page.evaluate(() => {
+        const entries = [...document.querySelectorAll('main [data-timeline-entry]')].filter((e) => !e.parentElement.closest('[data-timeline-entry]'));
+        return entries.map((e) => (e.querySelector('article') ? 'post' : 'notice') + ':' + e.querySelectorAll(':scope .twblock-btn-container').length);
+      });
+      check('x-web 通知: お知らせ行には出さず投稿には出す',
+        r.filter((x) => x.startsWith('notice')).every((x) => x === 'notice:0') && r.filter((x) => x.startsWith('post')).every((x) => x !== 'post:0') && r.length >= 6,
+        JSON.stringify(r));
+      await page.close();
+    }
+
+    // 8. ログアウト中はボタンを出さない（ct0 が無いと操作できない）
+    {
+      const { page } = await H.openShot(browser, 'profile--logged-out', { width: 1280 });
+      const n = await page.evaluate(() => document.querySelectorAll('.twblock-btn-container').length);
+      check('x-web ログアウト中: ボタンを出さない', n === 0, `got ${n}`);
+      await page.close();
+    }
+
+    // 9. この拡張でブロック済みと記録した人: 投稿は畳み、ユーザー行のボタンは済みの表示
+    {
+      // 拡張のストレージには拡張のページ（設定画面）から書く。service worker は眠っていることがある
+      const ext = await browser.newPage();
+      await ext.goto('chrome-extension://' + browser.__xwhExtensionId + '/options.html');
+      await ext.evaluate(() => chrome.storage.local.set({ blockedUsersV2: { fake_bob: { b: 1, m: 0 } } }));
+      const { page } = await H.openShot(browser, 'home', { width: 1280 });
+      const post = await page.evaluate(() => {
+        const e = [...document.querySelectorAll('[data-timeline-entry]')].find((x) => (x.getAttribute('data-href') || '').startsWith('/fake_bob/status/'));
+        return Boolean(e && e.querySelector(':scope > article > .twblock-hidden-bar'));
+      });
+      check('x-web ホーム: 記録済みの人の投稿を畳む', post);
+      await page.close();
+      const { page: p2 } = await H.openShot(browser, 'following', { width: 1280 });
+      const btn = await p2.evaluate(() => {
+        const c = document.querySelector('.twblock-btn-container[data-screen-name="fake_bob"]');
+        const b = c && c.querySelector('.twblock-block');
+        return b ? b.getAttribute('aria-pressed') : null;
+      });
+      check('x-web フォロー一覧: 記録済みの人はブロック済みの表示', btn === 'true', `got ${btn}`);
+      await p2.close();
+      await ext.evaluate(() => chrome.storage.local.remove('blockedUsersV2'));
+      await ext.close();
+    }
+  } catch (err) {
+    check('x-web harness: 例外なく回る', false, err && err.stack || err);
+  } finally {
+    await browser.close();
+  }
+}
+
 (async () => {
   const puppeteer = loadPuppeteer();
   const chromePath = findChrome();
@@ -1207,6 +1396,8 @@ function check(name, ok, detail) {
     await browser.close();
     server.close();
   }
+
+  await xwebHarnessTests();
 
   const failed = results.filter((r) => !r.ok);
   console.log(`\n${results.length - failed.length}/${results.length} passed`);

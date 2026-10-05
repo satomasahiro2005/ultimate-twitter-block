@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Ultimate Twitter Block
 // @namespace    twitter-block-userscript
-// @version      2.4.0
+// @version      2.4.1
 // @description  Add one-click block/mute buttons to tweets, profiles, and search suggestions on Twitter/X
 // @author       nemut.ai
 // @match        https://x.com/*
@@ -276,7 +276,7 @@
     if (document.getElementById('twblock-style')) return;
     const style = document.createElement('style');
     style.id = 'twblock-style';
-    style.textContent = "/* ========== Ultimate Twitter Block ========== */\r\n\r\n/* ボタンコンテナ（共通） */\r\n.twblock-btn-container {\r\n  display: flex;\r\n  align-items: center;\r\n  flex-shrink: 0;\r\n}\r\n\r\n/* ツイートヘッダー: Grok/caret行内に配置 (Grok/caretと同サイズ) */\r\n.twblock-btn-container.twblock-tweet {\r\n  flex: 0 0 auto;\r\n  gap: 8px;\r\n}\r\n\r\n.twblock-btn-container.twblock-tweet .twblock-btn {\r\n  width: 20px;\r\n  height: 20px;\r\n  position: relative;\r\n  overflow: visible;\r\n}\r\n\r\n/* ホバー時の丸は見た目専用。クリック判定は ::after が持つ */\r\n.twblock-btn-container.twblock-tweet .twblock-btn::before {\r\n  content: '';\r\n  position: absolute;\r\n  top: 50%;\r\n  left: 50%;\r\n  width: 34px;\r\n  height: 34px;\r\n  margin: -17px;\r\n  border-radius: 50%;\r\n  transition: background-color 0.15s ease;\r\n  pointer-events: none;\r\n}\r\n\r\n/* クリック判定を広げる。左右はボタン間の隙間(8px)の半分ずつだけ取り、\r\n   隣のボタンと取り合いにならないようにする */\r\n.twblock-btn-container.twblock-tweet .twblock-btn::after {\r\n  content: '';\r\n  position: absolute;\r\n  top: 50%;\r\n  left: 50%;\r\n  width: 28px;\r\n  height: 32px;\r\n  margin: -16px -14px;\r\n}\r\n\r\n/* 狭い画面ではヘッダーに Follow ボタンが出る。この行は上揃えのことがあり\r\n   （iPhone 実測）、背の高いものだけが下にはみ出す。行の揃え方に関係なく、\r\n   Follow や caret と中心を合わせる */\r\ndiv:has([data-testid$=\"-follow\"], [data-testid$=\"-unfollow\"]) > .twblock-btn-container.twblock-tweet:not(.twblock-repost) {\r\n  align-self: center;\r\n}\r\n\r\n/* Follow が 32px の pill で出るとき（PCの狭い窓）だけ、X のボタンと釣り合うように丸で囲う。\r\n   スマホの Follow は 24px で、そこに 32px の丸を付けると grok や ⋯ より大きい輪になり、\r\n   しかも上揃えの行で 4px 下にはみ出す。だから小さいときは素のアイコンのままにする。\r\n   pill かどうかは content.js が判定して .twblock-pill を付ける。\r\n   :has() も残してあるので、窓を広げて Follow が消えれば印が残っていても丸は消える */\r\ndiv:has([data-testid$=\"-follow\"], [data-testid$=\"-unfollow\"]) > .twblock-btn-container.twblock-tweet.twblock-pill:not(.twblock-repost) {\r\n  gap: 6px;\r\n}\r\n\r\ndiv:has([data-testid$=\"-follow\"], [data-testid$=\"-unfollow\"]) > .twblock-btn-container.twblock-tweet.twblock-pill:not(.twblock-repost) .twblock-btn {\r\n  width: 32px;\r\n  height: 32px;\r\n  /* 輪郭だけ Follow ボタンの色を薄く借りる。アイコン自体は caret や ⋯ と同じ灰色のまま\r\n     （--twblock-follow-tone は content.js が隣の Follow ボタンから実測して入れる） */\r\n  border: 1px solid color-mix(in srgb, var(--twblock-follow-tone, currentColor) 35%, transparent);\r\n  border-radius: 9999px;\r\n}\r\n\r\n/* ホバーの丸も同じ大きさに。margin は直径の半分（既定の -17px は 34px 用） */\r\ndiv:has([data-testid$=\"-follow\"], [data-testid$=\"-unfollow\"]) > .twblock-btn-container.twblock-tweet.twblock-pill:not(.twblock-repost) .twblock-btn::before {\r\n  width: 32px;\r\n  height: 32px;\r\n  margin: -16px;\r\n}\r\n\r\n/* この行では X の caret や ⋯ が白なので、アイコンもそれに合わせる（行から継承する）。\r\n   :not(:hover) にしてあるのは、ホバー時の赤/青を上書きしないため */\r\ndiv:has([data-testid$=\"-follow\"], [data-testid$=\"-unfollow\"]) > .twblock-btn-container.twblock-tweet.twblock-pill:not(.twblock-repost) .twblock-btn:not(:hover) {\r\n  color: inherit;\r\n}\r\n\r\n.twblock-btn-container.twblock-tweet .twblock-btn svg {\r\n  width: 18.75px;\r\n  height: 18.75px;\r\n  position: relative;\r\n}\r\n\r\n/* ツイートボタン: ホバー背景は::beforeで表示、ボタン自体は透明 */\r\n.twblock-btn-container.twblock-tweet .twblock-block:hover:not(:disabled),\r\n.twblock-btn-container.twblock-tweet .twblock-mute:hover:not(:disabled) {\r\n  background-color: transparent;\r\n}\r\n\r\n.twblock-btn-container.twblock-tweet .twblock-block:hover:not(:disabled)::before {\r\n  background-color: rgba(244, 33, 46, 0.1);\r\n}\r\n\r\n.twblock-btn-container.twblock-tweet .twblock-mute:hover:not(:disabled)::before {\r\n  background-color: rgba(255, 173, 31, 0.1);\r\n}\r\n\r\n.twblock-btn-container.twblock-tweet .twblock-success:hover {\r\n  background-color: transparent !important;\r\n}\r\n\r\n.twblock-btn-container.twblock-tweet .twblock-block.twblock-success:hover::before {\r\n  background-color: rgba(244, 33, 46, 0.1);\r\n}\r\n\r\n.twblock-btn-container.twblock-tweet .twblock-mute.twblock-success:hover::before {\r\n  background-color: rgba(255, 173, 31, 0.1);\r\n}\r\n\r\n\r\n/* ---- x-web（ログアウト中の新しいフロント）に馴染ませる ----\r\n   x-web は色を CSS 変数で外に出していないので、行の文字色（テーマで白/黒が変わる）\r\n   から作る。実測（ダーク）: 本文 #fff / 補足 rgba(255,255,255,.6) /\r\n   輪郭 rgba(255,255,255,.15)。ライトでも同じ比率で黒から作られる */\r\n\r\n/* ボタン: ヘッダー右端の「もっと見る」と同じ 32px の丸。アイコンは\r\n   エンゲージメント行と同じ 18px で、色も「もっと見る」と同じ本文色。\r\n   -8px は「もっと見る」と同じ -my-2（行の高さを押し広げない） */\r\n.twblock-btn-container.twblock-xweb {\r\n  gap: 0;\r\n  margin: -8px 0;\r\n}\r\n\r\n.twblock-btn-container.twblock-xweb .twblock-btn {\r\n  width: 32px;\r\n  height: 32px;\r\n}\r\n\r\n.twblock-btn-container.twblock-xweb .twblock-btn:not(:hover):not(.twblock-success) {\r\n  color: inherit;\r\n}\r\n\r\n.twblock-btn-container.twblock-xweb .twblock-btn svg {\r\n  width: 18px;\r\n  height: 18px;\r\n}\r\n\r\n.twblock-btn-container.twblock-xweb .twblock-btn::before {\r\n  width: 32px;\r\n  height: 32px;\r\n  margin: -16px;\r\n}\r\n\r\n.twblock-btn-container.twblock-xweb .twblock-btn::after {\r\n  width: 32px;\r\n  height: 32px;\r\n  margin: -16px;\r\n}\r\n\r\n/* 畳んだ投稿のバー。投稿の余白は外側の entry（px-horizontal py-vertical）が持つので、\r\n   こちらは余白を足さず、アバターの左端に文字をそろえる */\r\n[data-timeline-entry] > article > .twblock-hidden-bar {\r\n  padding: 0;\r\n  min-height: 32px;\r\n  font-family: inherit;\r\n}\r\n\r\n/* 引用カードの中は X 自身が 12px（p-3）の余白を取っている */\r\narticle [data-timeline-entry] > article > .twblock-hidden-bar {\r\n  padding: 12px;\r\n}\r\n\r\n[data-timeline-entry] > article > .twblock-hidden-bar .twblock-hidden-label {\r\n  color: color-mix(in srgb, currentColor 60%, transparent);\r\n  font-size: 15px;\r\n  line-height: 20px;\r\n}\r\n\r\n/* X の輪郭ボタン（「@ポスト」など）を 32px にしたもの */\r\n[data-timeline-entry] > article > .twblock-hidden-bar .twblock-show-btn {\r\n  height: 32px;\r\n  padding: 0 16px;\r\n  border-radius: 9999px;\r\n  font-family: inherit;\r\n  font-size: 14px;\r\n  font-weight: 500;\r\n  line-height: 16px;\r\n}\r\n\r\n/* 「ブロックに切替」の赤だけは残す */\r\n[data-timeline-entry] > article > .twblock-hidden-bar .twblock-show-btn:not(.twblock-bar-danger) {\r\n  border-color: color-mix(in srgb, currentColor 15%, transparent);\r\n  color: inherit;\r\n}\r\n\r\n[data-timeline-entry] > article > .twblock-hidden-bar .twblock-show-btn:hover:not(:disabled) {\r\n  background-color: color-mix(in srgb, currentColor 10%, transparent);\r\n}\r\n\r\n/* RT(\"reposted\")行の親をflex-rowに変更して横並びにする */\r\n.twblock-repost-row {\r\n  flex-direction: row !important;\r\n  align-items: center;\r\n  gap: 4px;\r\n}\r\n\r\n/* RT(\"reposted\")行: テキスト(16px/20px line-height)とアイコンの中心を揃える */\r\n.twblock-btn-container.twblock-repost {\r\n  gap: 4px;\r\n  margin-top: -2px;\r\n  margin-bottom: -2px;\r\n}\r\n\r\n/* 行が詰まっているので丸い背景は出さないが、押せる範囲は確保する */\r\n.twblock-btn-container.twblock-repost .twblock-btn::before {\r\n  display: none;\r\n}\r\n\r\n.twblock-btn-container.twblock-repost .twblock-btn::after {\r\n  width: 24px;\r\n  height: 26px;\r\n  margin: -13px -12px;\r\n}\r\n\r\n/* プロフィール: Followボタンと同じ高さ(36px)の丸ボタン */\r\n.twblock-btn-container.twblock-profile {\r\n  gap: 8px;\r\n  align-self: flex-start;\r\n  margin-right: 8px;\r\n}\r\n\r\n/* X はプロフィールの操作行にボタンを後から足すことがある（サブスク等）。\r\n   Followボタンの直前に挿しても、後から生えたものがこちらとFollowの間に割り込むので、\r\n   同じプロフィールでもリロードのたびに並び順が変わる。\r\n   DOM上の位置に関係なく「X のボタン群 → こちら → Follow」に固定する。\r\n   :has() が無い環境では order を付けないでおく（付けるとFollowより右へ行ってしまう） */\r\n@supports selector(:has(*)) {\r\n  .twblock-btn-container.twblock-profile {\r\n    order: 1;\r\n  }\r\n\r\n  div:has(> .twblock-btn-container.twblock-profile) > [data-testid=\"placementTracking\"] {\r\n    order: 2;\r\n  }\r\n\r\n}\r\n\r\n.twblock-btn-container.twblock-profile .twblock-btn {\r\n  width: 36px;\r\n  height: 36px;\r\n  border-radius: 50%;\r\n  border: 1px solid light-dark(rgb(207, 217, 222), rgb(83, 100, 113));\r\n  color: light-dark(rgb(15, 20, 26), rgb(230, 233, 234));\r\n}\r\n\r\n.twblock-btn-container.twblock-profile .twblock-btn svg {\r\n  width: 20px;\r\n  height: 20px;\r\n}\r\n\r\n/* 検索候補(typeahead): Xボタンの左に配置 */\r\n.twblock-btn-container.twblock-typeahead {\r\n  gap: 4px;\r\n  flex-shrink: 0;\r\n  margin-left: auto;\r\n}\r\n\r\n.twblock-btn-container.twblock-typeahead .twblock-btn {\r\n  width: 20px;\r\n  height: 20px;\r\n}\r\n\r\n.twblock-btn-container.twblock-typeahead .twblock-btn svg {\r\n  width: 18px;\r\n  height: 18px;\r\n}\r\n\r\n/* サイドバー / フォロー一覧: 32px丸ボタン */\r\n.twblock-btn-container.twblock-sidebar {\r\n  gap: 4px;\r\n  flex-shrink: 0;\r\n  /* Verified Followers / Following の行は justify-content: space-between なので、\r\n     Followボタンと別のflexアイテムとして置くと空きスペースを山分けされて真ん中に飛ぶ。\r\n     auto マージンで余白を全部こちら側に吸わせて、Followボタンの隣に寄せる。\r\n     余白が無い行（Followers など）では 0 に解決されるので位置は変わらない */\r\n  margin-left: auto;\r\n}\r\n\r\n/* Followボタンを包み直す（reparent）とReactのDOM差分が壊れるので、\r\n   間隔は隣接兄弟セレクタだけで確保する（Issue #14）。\r\n   X 側は 12px だが、ここを 4px にすると v2.2.4（ラッパーで margin を 0 にして\r\n   gap:4px を当てていた）と同じ見た目になる。実ページで採寸して確認済み。\r\n   コンテナの直後は必ず Follow ボタンの親なので、他の要素には当たらない */\r\n.twblock-btn-container.twblock-sidebar + * {\r\n  margin-left: 4px !important;\r\n}\r\n\r\n.twblock-btn-container.twblock-sidebar .twblock-btn {\r\n  width: 32px;\r\n  height: 32px;\r\n  border-radius: 50%;\r\n  border: 1px solid light-dark(rgb(207, 217, 222), rgb(83, 100, 113));\r\n  color: light-dark(rgb(15, 20, 26), rgb(230, 233, 234));\r\n}\r\n\r\n.twblock-btn-container.twblock-sidebar .twblock-btn svg {\r\n  width: 18px;\r\n  height: 18px;\r\n}\r\n\r\n/* ホバーカード: Followボタンとの間隔を少し広めに */\r\n.twblock-btn-container.twblock-hovercard + * {\r\n  margin-left: 8px !important;\r\n}\r\n\r\n/* ホバーカードの行は 64px のアバターが高さを決めていて align-items: stretch。\r\n   X の Followボタン(36px)はその箱の上端に置かれるので、共通の center 揃えの\r\n   ままだと自分のボタンだけ 14px 下にずれる（実測: 中心 719 対 705）。\r\n   X と同じく上端に寄せ、36pxのpillと32pxの丸の差 (36-32)/2 を足して中心を揃える */\r\n.twblock-btn-container.twblock-hovercard {\r\n  align-items: flex-start;\r\n  padding-top: 2px;\r\n}\r\n\r\n\r\n/* 個別ボタン（デフォルト: 34x34, アイコン20x20） */\r\n.twblock-btn {\r\n  display: inline-flex;\r\n  align-items: center;\r\n  justify-content: center;\r\n  width: 34px;\r\n  height: 34px;\r\n  border-radius: 50%;\r\n  border: none;\r\n  background: transparent;\r\n  cursor: pointer;\r\n  padding: 0;\r\n  transition: background-color 0.15s ease, color 0.15s ease;\r\n  color: light-dark(rgb(83, 100, 113), rgb(113, 118, 123));\r\n  outline: none;\r\n}\r\n\r\n.twblock-btn:focus-visible {\r\n  box-shadow: 0 0 0 2px rgb(29, 155, 240);\r\n}\r\n\r\n.twblock-btn svg {\r\n  width: 20px;\r\n  height: 20px;\r\n  fill: currentColor;\r\n  pointer-events: none;\r\n}\r\n\r\n/* ブロックボタン: ホバーで赤 */\r\n.twblock-block:hover:not(:disabled) {\r\n  background-color: rgba(244, 33, 46, 0.1);\r\n  color: rgb(244, 33, 46);\r\n}\r\n\r\n/* ミュートボタン: ホバーでオレンジ */\r\n.twblock-mute:hover:not(:disabled) {\r\n  background-color: rgba(255, 173, 31, 0.1);\r\n  color: rgb(255, 173, 31);\r\n}\r\n\r\n/* ローディング状態 */\r\n.twblock-loading {\r\n  opacity: 0.5;\r\n  pointer-events: none;\r\n}\r\n\r\n.twblock-loading svg {\r\n  animation: twblock-spin 0.8s linear infinite;\r\n}\r\n\r\n@keyframes twblock-spin {\r\n  from { transform: rotate(0deg); }\r\n  to { transform: rotate(360deg); }\r\n}\r\n\r\n/* 成功状態: 緑 (クリックで解除可能) */\r\n.twblock-success {\r\n  color: rgb(0, 186, 124) !important;\r\n}\r\n\r\n/* 解除のホバー色は、その操作の色に合わせる */\r\n.twblock-block.twblock-success:hover {\r\n  background-color: rgba(244, 33, 46, 0.1) !important;\r\n  color: rgb(244, 33, 46) !important;\r\n}\r\n\r\n.twblock-mute.twblock-success:hover {\r\n  background-color: rgba(255, 173, 31, 0.1) !important;\r\n  color: rgb(255, 173, 31) !important;\r\n}\r\n\r\n/* エラー状態 */\r\n.twblock-error {\r\n  color: rgb(244, 33, 46) !important;\r\n  animation: twblock-shake 0.3s ease;\r\n}\r\n\r\n@keyframes twblock-shake {\r\n  0%, 100% { transform: translateX(0); }\r\n  25% { transform: translateX(-3px); }\r\n  75% { transform: translateX(3px); }\r\n}\r\n\r\n/* 引用ツイートのカードは min-height:64px を持っていて、畳むと 57px のバーだけが残る。\r\n   flex の縦並びなので余りが全部下に落ち、下だけ 5px 長く見える。\r\n   畳んだ親は可視の子がバー1枚だけなので、中央に置いて差を分ける。\r\n   横並びの親では主軸が水平で、バーが width:100% なので何も起きない */\r\n[data-twblock-collapsed] {\r\n  justify-content: center;\r\n}\r\n\r\n/* ---- ブロック/ミュート後の非表示バー ---- */\r\n/* 畳んだ投稿の中身。JSでも display:none を入れているが、画像の遅延ロードのように\r\n   後から足される子はここで隠す。これが無いと隠し直すために毎フレーム走ることになる */\r\n[data-twblock-collapsed] > *:not(.twblock-hidden-bar) {\r\n  display: none !important;\r\n}\r\n\r\n.twblock-hidden-bar {\r\n  display: flex;\r\n  align-items: center;\r\n  /* X の reset は自前のクラスにしか box-sizing を当てないので、こちらは\r\n     初期値の content-box のままになる。width:100% と padding が足し算になり、\r\n     cellInnerDiv のような伸び縮みしない親では右へ32pxはみ出して、\r\n     右端に寄せたボタンがツイートの外に出る */\r\n  box-sizing: border-box;\r\n  /* 幅いっぱいに広げたので、center だと文字が真ん中に飛ぶ。本文と同じ左寄せ */\r\n  justify-content: flex-start;\r\n  flex-wrap: wrap;\r\n  gap: 8px 12px;\r\n  padding: 14px 16px;\r\n  font-family: -apple-system, BlinkMacSystemFont, \"Segoe UI\", Roboto, Helvetica, Arial, sans-serif;\r\n  /* article[data-testid=\"tweet\"] は flex の行なので、指定しないと文字幅まで縮む。\r\n     縮むと下線も文字の下だけになり、X のセル区切り線と1px差で二重に見える。\r\n     区切り線は X 側が持っているので、こちらは線を引かない */\r\n  width: 100%;\r\n}\r\n\r\n.twblock-hidden-label {\r\n  color: rgb(113, 118, 123);\r\n  font-size: 14px;\r\n}\r\n\r\n/* ボタン群は行の右端へ。ブロック/ミュートを押した直後のカーソルがそこにいる */\r\n.twblock-hidden-bar:not(.twblock-notice-bar) .twblock-show-btn:first-of-type {\r\n  margin-left: auto;\r\n}\r\n\r\n.twblock-show-btn {\r\n  background: none;\r\n  border: 1px solid light-dark(rgb(207, 217, 222), rgb(83, 100, 113));\r\n  border-radius: 16px;\r\n  color: light-dark(rgb(15, 20, 26), rgb(239, 243, 244));\r\n  font-size: 13px;\r\n  padding: 4px 14px;\r\n  cursor: pointer;\r\n  transition: background-color 0.15s ease;\r\n  white-space: nowrap;\r\n}\r\n\r\n.twblock-show-btn:hover:not(:disabled) {\r\n  background-color: light-dark(rgba(15, 20, 25, 0.1), rgba(239, 243, 244, 0.1));\r\n}\r\n\r\n.twblock-show-btn:disabled {\r\n  opacity: 0.5;\r\n  cursor: default;\r\n}\r\n\r\n/* ミュート→ブロックの切り替え */\r\n.twblock-show-btn.twblock-bar-danger {\r\n  border-color: rgba(244, 33, 46, 0.5);\r\n  color: rgb(244, 33, 46);\r\n}\r\n\r\n.twblock-show-btn.twblock-bar-danger:hover:not(:disabled) {\r\n  background-color: rgba(244, 33, 46, 0.1);\r\n}\r\n\r\n/* API側で解除できないときの逃げ道 */\r\n.twblock-show-btn.twblock-bar-force {\r\n  border-style: dashed;\r\n  color: rgb(113, 118, 123);\r\n}\r\n\r\n/* ---- プロフィールでブロックした直後の通知バー ----\r\n   X 純正の「You have muted posts from this account. Unmute」に合わせる。\r\n   枠も背景も持たず、15px/20px のグレー本文＋アクセント色のテキストリンク。\r\n   採寸値: color rgb(113,118,123) / link rgb(29,155,240) / margin 12px 0 / padding 0 */\r\n.twblock-notice-bar {\r\n  display: block;\r\n  margin: 12px 0;\r\n  padding: 0;\r\n  border: none;\r\n  font-size: 15px;\r\n  line-height: 20px;\r\n}\r\n\r\n.twblock-notice-bar .twblock-hidden-label {\r\n  font-size: 15px;\r\n  line-height: 20px;\r\n}\r\n\r\n.twblock-notice-bar .twblock-show-btn {\r\n  border: none;\r\n  border-radius: 0;\r\n  padding: 0;\r\n  margin-left: 8px;\r\n  background: none;\r\n  font-size: 15px;\r\n  line-height: 20px;\r\n  color: var(--twblock-accent, rgb(29, 155, 240));\r\n}\r\n\r\n.twblock-notice-bar .twblock-show-btn:hover:not(:disabled) {\r\n  background: none;\r\n  text-decoration: underline;\r\n}\r\n\r\n/* ---- トースト通知 ---- */\r\n.twblock-toast {\r\n  position: fixed;\r\n  bottom: 40px;\r\n  left: 50%;\r\n  transform: translateX(-50%);\r\n  background: rgb(29, 155, 240);\r\n  color: rgb(255, 255, 255);\r\n  padding: 12px 24px;\r\n  border-radius: 4px;\r\n  font-size: 15px;\r\n  font-family: -apple-system, BlinkMacSystemFont, \"Segoe UI\", Roboto, sans-serif;\r\n  z-index: 10000;\r\n  animation: twblock-toast-in 0.3s ease;\r\n}\r\n\r\n.twblock-toast-hide {\r\n  opacity: 0;\r\n  transition: opacity 0.3s ease;\r\n}\r\n\r\n@keyframes twblock-toast-in {\r\n  from { opacity: 0; transform: translateX(-50%) translateY(10px); }\r\n  to { opacity: 1; transform: translateX(-50%) translateY(0); }\r\n}\r\n";
+    style.textContent = "/* ========== Ultimate Twitter Block ========== */\r\n\r\n/* ボタンコンテナ（共通） */\r\n.twblock-btn-container {\r\n  display: flex;\r\n  align-items: center;\r\n  flex-shrink: 0;\r\n}\r\n\r\n/* ツイートヘッダー: Grok/caret行内に配置 (Grok/caretと同サイズ) */\r\n.twblock-btn-container.twblock-tweet {\r\n  flex: 0 0 auto;\r\n  gap: 8px;\r\n}\r\n\r\n.twblock-btn-container.twblock-tweet .twblock-btn {\r\n  width: 20px;\r\n  height: 20px;\r\n  position: relative;\r\n  overflow: visible;\r\n}\r\n\r\n/* ホバー時の丸は見た目専用。クリック判定は ::after が持つ */\r\n.twblock-btn-container.twblock-tweet .twblock-btn::before {\r\n  content: '';\r\n  position: absolute;\r\n  top: 50%;\r\n  left: 50%;\r\n  width: 34px;\r\n  height: 34px;\r\n  margin: -17px;\r\n  border-radius: 50%;\r\n  transition: background-color 0.15s ease;\r\n  pointer-events: none;\r\n}\r\n\r\n/* クリック判定を広げる。左右はボタン間の隙間(8px)の半分ずつだけ取り、\r\n   隣のボタンと取り合いにならないようにする */\r\n.twblock-btn-container.twblock-tweet .twblock-btn::after {\r\n  content: '';\r\n  position: absolute;\r\n  top: 50%;\r\n  left: 50%;\r\n  width: 28px;\r\n  height: 32px;\r\n  margin: -16px -14px;\r\n}\r\n\r\n/* 狭い画面ではヘッダーに Follow ボタンが出る。この行は上揃えのことがあり\r\n   （iPhone 実測）、背の高いものだけが下にはみ出す。行の揃え方に関係なく、\r\n   Follow や caret と中心を合わせる */\r\ndiv:has([data-testid$=\"-follow\"], [data-testid$=\"-unfollow\"]) > .twblock-btn-container.twblock-tweet:not(.twblock-repost) {\r\n  align-self: center;\r\n}\r\n\r\n/* Follow が 32px の pill で出るとき（PCの狭い窓）だけ、X のボタンと釣り合うように丸で囲う。\r\n   スマホの Follow は 24px で、そこに 32px の丸を付けると grok や ⋯ より大きい輪になり、\r\n   しかも上揃えの行で 4px 下にはみ出す。だから小さいときは素のアイコンのままにする。\r\n   pill かどうかは content.js が判定して .twblock-pill を付ける。\r\n   :has() も残してあるので、窓を広げて Follow が消えれば印が残っていても丸は消える */\r\ndiv:has([data-testid$=\"-follow\"], [data-testid$=\"-unfollow\"]) > .twblock-btn-container.twblock-tweet.twblock-pill:not(.twblock-repost) {\r\n  gap: 6px;\r\n}\r\n\r\ndiv:has([data-testid$=\"-follow\"], [data-testid$=\"-unfollow\"]) > .twblock-btn-container.twblock-tweet.twblock-pill:not(.twblock-repost) .twblock-btn {\r\n  width: 32px;\r\n  height: 32px;\r\n  /* 輪郭だけ Follow ボタンの色を薄く借りる。アイコン自体は caret や ⋯ と同じ灰色のまま\r\n     （--twblock-follow-tone は content.js が隣の Follow ボタンから実測して入れる） */\r\n  border: 1px solid color-mix(in srgb, var(--twblock-follow-tone, currentColor) 35%, transparent);\r\n  border-radius: 9999px;\r\n}\r\n\r\n/* ホバーの丸も同じ大きさに。margin は直径の半分（既定の -17px は 34px 用） */\r\ndiv:has([data-testid$=\"-follow\"], [data-testid$=\"-unfollow\"]) > .twblock-btn-container.twblock-tweet.twblock-pill:not(.twblock-repost) .twblock-btn::before {\r\n  width: 32px;\r\n  height: 32px;\r\n  margin: -16px;\r\n}\r\n\r\n/* この行では X の caret や ⋯ が白なので、アイコンもそれに合わせる（行から継承する）。\r\n   :not(:hover) にしてあるのは、ホバー時の赤/青を上書きしないため */\r\ndiv:has([data-testid$=\"-follow\"], [data-testid$=\"-unfollow\"]) > .twblock-btn-container.twblock-tweet.twblock-pill:not(.twblock-repost) .twblock-btn:not(:hover) {\r\n  color: inherit;\r\n}\r\n\r\n.twblock-btn-container.twblock-tweet .twblock-btn svg {\r\n  width: 18.75px;\r\n  height: 18.75px;\r\n  position: relative;\r\n}\r\n\r\n/* ツイートボタン: ホバー背景は::beforeで表示、ボタン自体は透明 */\r\n.twblock-btn-container.twblock-tweet .twblock-block:hover:not(:disabled),\r\n.twblock-btn-container.twblock-tweet .twblock-mute:hover:not(:disabled) {\r\n  background-color: transparent;\r\n}\r\n\r\n.twblock-btn-container.twblock-tweet .twblock-block:hover:not(:disabled)::before {\r\n  background-color: rgba(244, 33, 46, 0.1);\r\n}\r\n\r\n.twblock-btn-container.twblock-tweet .twblock-mute:hover:not(:disabled)::before {\r\n  background-color: rgba(255, 173, 31, 0.1);\r\n}\r\n\r\n.twblock-btn-container.twblock-tweet .twblock-success:hover {\r\n  background-color: transparent !important;\r\n}\r\n\r\n.twblock-btn-container.twblock-tweet .twblock-block.twblock-success:hover::before {\r\n  background-color: rgba(244, 33, 46, 0.1);\r\n}\r\n\r\n.twblock-btn-container.twblock-tweet .twblock-mute.twblock-success:hover::before {\r\n  background-color: rgba(255, 173, 31, 0.1);\r\n}\r\n\r\n\r\n/* ---- x-web（ログアウト中の新しいフロント）に馴染ませる ----\r\n   x-web は色を CSS 変数で外に出していないので、行の文字色（テーマで白/黒が変わる）\r\n   から作る。実測（ダーク）: 本文 #fff / 補足 rgba(255,255,255,.6) /\r\n   輪郭 rgba(255,255,255,.15)。ライトでも同じ比率で黒から作られる */\r\n\r\n/* ボタン: ヘッダー右端の「もっと見る」と同じ 32px の丸。アイコンは\r\n   エンゲージメント行と同じ 18px で、色も「もっと見る」と同じ本文色。\r\n   -8px は「もっと見る」と同じ -my-2（行の高さを押し広げない） */\r\n.twblock-btn-container.twblock-xweb {\r\n  gap: 0;\r\n  margin: -8px 0;\r\n}\r\n\r\n.twblock-btn-container.twblock-xweb .twblock-btn {\r\n  width: 32px;\r\n  height: 32px;\r\n}\r\n\r\n.twblock-btn-container.twblock-xweb .twblock-btn:not(:hover):not(.twblock-success) {\r\n  color: inherit;\r\n}\r\n\r\n.twblock-btn-container.twblock-xweb .twblock-btn svg {\r\n  width: 18px;\r\n  height: 18px;\r\n}\r\n\r\n.twblock-btn-container.twblock-xweb .twblock-btn::before {\r\n  width: 32px;\r\n  height: 32px;\r\n  margin: -16px;\r\n}\r\n\r\n.twblock-btn-container.twblock-xweb .twblock-btn::after {\r\n  width: 32px;\r\n  height: 32px;\r\n  margin: -16px;\r\n}\r\n\r\n/* 畳んだ投稿のバー。投稿の余白は外側の entry（px-horizontal py-vertical）が持つので、\r\n   こちらは余白を足さず、アバターの左端に文字をそろえる */\r\n[data-timeline-entry] > article > .twblock-hidden-bar {\r\n  padding: 0;\r\n  min-height: 32px;\r\n  font-family: inherit;\r\n}\r\n\r\n/* 引用カードの中は X 自身が 12px（p-3）の余白を取っている */\r\narticle [data-timeline-entry] > article > .twblock-hidden-bar {\r\n  padding: 12px;\r\n}\r\n\r\n[data-timeline-entry] > article > .twblock-hidden-bar .twblock-hidden-label {\r\n  color: color-mix(in srgb, currentColor 60%, transparent);\r\n  font-size: 15px;\r\n  line-height: 20px;\r\n}\r\n\r\n/* X の輪郭ボタン（「@ポスト」など）を 32px にしたもの */\r\n[data-timeline-entry] > article > .twblock-hidden-bar .twblock-show-btn {\r\n  height: 32px;\r\n  padding: 0 16px;\r\n  border-radius: 9999px;\r\n  font-family: inherit;\r\n  font-size: 14px;\r\n  font-weight: 500;\r\n  line-height: 16px;\r\n}\r\n\r\n/* 「ブロックに切替」の赤だけは残す */\r\n[data-timeline-entry] > article > .twblock-hidden-bar .twblock-show-btn:not(.twblock-bar-danger) {\r\n  border-color: color-mix(in srgb, currentColor 15%, transparent);\r\n  color: inherit;\r\n}\r\n\r\n[data-timeline-entry] > article > .twblock-hidden-bar .twblock-show-btn:hover:not(:disabled) {\r\n  background-color: color-mix(in srgb, currentColor 10%, transparent);\r\n}\r\n\r\n/* RT(\"reposted\")行の親をflex-rowに変更して横並びにする */\r\n.twblock-repost-row {\r\n  flex-direction: row !important;\r\n  align-items: center;\r\n  gap: 4px;\r\n}\r\n\r\n/* RT(\"reposted\")行: テキスト(16px/20px line-height)とアイコンの中心を揃える */\r\n.twblock-btn-container.twblock-repost {\r\n  gap: 4px;\r\n  margin-top: -2px;\r\n  margin-bottom: -2px;\r\n}\r\n\r\n/* 行が詰まっているので丸い背景は出さないが、押せる範囲は確保する */\r\n.twblock-btn-container.twblock-repost .twblock-btn::before {\r\n  display: none;\r\n}\r\n\r\n.twblock-btn-container.twblock-repost .twblock-btn::after {\r\n  width: 24px;\r\n  height: 26px;\r\n  margin: -13px -12px;\r\n}\r\n\r\n/* プロフィール: Followボタンと同じ高さ(36px)の丸ボタン */\r\n.twblock-btn-container.twblock-profile {\r\n  gap: 8px;\r\n  align-self: flex-start;\r\n  margin-right: 8px;\r\n}\r\n\r\n/* X はプロフィールの操作行にボタンを後から足すことがある（サブスク等）。\r\n   Followボタンの直前に挿しても、後から生えたものがこちらとFollowの間に割り込むので、\r\n   同じプロフィールでもリロードのたびに並び順が変わる。\r\n   DOM上の位置に関係なく「X のボタン群 → こちら → Follow」に固定する。\r\n   :has() が無い環境では order を付けないでおく（付けるとFollowより右へ行ってしまう） */\r\n@supports selector(:has(*)) {\r\n  .twblock-btn-container.twblock-profile {\r\n    order: 1;\r\n  }\r\n\r\n  div:has(> .twblock-btn-container.twblock-profile) > [data-testid=\"placementTracking\"] {\r\n    order: 2;\r\n  }\r\n\r\n}\r\n\r\n.twblock-btn-container.twblock-profile .twblock-btn {\r\n  width: 36px;\r\n  height: 36px;\r\n  border-radius: 50%;\r\n  border: 1px solid light-dark(rgb(207, 217, 222), rgb(83, 100, 113));\r\n  color: light-dark(rgb(15, 20, 26), rgb(230, 233, 234));\r\n}\r\n\r\n.twblock-btn-container.twblock-profile .twblock-btn svg {\r\n  width: 20px;\r\n  height: 20px;\r\n}\r\n\r\n/* 検索候補(typeahead): Xボタンの左に配置 */\r\n.twblock-btn-container.twblock-typeahead {\r\n  gap: 4px;\r\n  flex-shrink: 0;\r\n  margin-left: auto;\r\n}\r\n\r\n.twblock-btn-container.twblock-typeahead .twblock-btn {\r\n  width: 20px;\r\n  height: 20px;\r\n}\r\n\r\n.twblock-btn-container.twblock-typeahead .twblock-btn svg {\r\n  width: 18px;\r\n  height: 18px;\r\n}\r\n\r\n/* サイドバー / フォロー一覧: 32px丸ボタン */\r\n.twblock-btn-container.twblock-sidebar {\r\n  gap: 4px;\r\n  flex-shrink: 0;\r\n  /* Verified Followers / Following の行は justify-content: space-between なので、\r\n     Followボタンと別のflexアイテムとして置くと空きスペースを山分けされて真ん中に飛ぶ。\r\n     auto マージンで余白を全部こちら側に吸わせて、Followボタンの隣に寄せる。\r\n     余白が無い行（Followers など）では 0 に解決されるので位置は変わらない */\r\n  margin-left: auto;\r\n}\r\n\r\n/* Followボタンを包み直す（reparent）とReactのDOM差分が壊れるので、\r\n   間隔は隣接兄弟セレクタだけで確保する（Issue #14）。\r\n   X 側は 12px だが、ここを 4px にすると v2.2.4（ラッパーで margin を 0 にして\r\n   gap:4px を当てていた）と同じ見た目になる。実ページで採寸して確認済み。\r\n   コンテナの直後は必ず Follow ボタンの親なので、他の要素には当たらない */\r\n.twblock-btn-container.twblock-sidebar + * {\r\n  margin-left: 4px !important;\r\n}\r\n\r\n.twblock-btn-container.twblock-sidebar .twblock-btn {\r\n  width: 32px;\r\n  height: 32px;\r\n  border-radius: 50%;\r\n  border: 1px solid light-dark(rgb(207, 217, 222), rgb(83, 100, 113));\r\n  color: light-dark(rgb(15, 20, 26), rgb(230, 233, 234));\r\n}\r\n\r\n.twblock-btn-container.twblock-sidebar .twblock-btn svg {\r\n  width: 18px;\r\n  height: 18px;\r\n}\r\n\r\n/* ---- x-web（ログイン中）: ユーザー行・プロフィール・ホバーカード ----\r\n   x-web の輪郭ボタン（メッセージ・もっと見る・Following）と同じ形にする。\r\n   色は x-web が外に出していないので、x-web の投稿ボタンと同じく文字色から作る */\r\n.twblock-btn-container.twblock-xweb-user,\r\n.twblock-btn-container.twblock-xweb-profile,\r\n.twblock-btn-container.twblock-xweb-hover {\r\n  gap: 8px;\r\n}\r\n\r\n.twblock-btn-container.twblock-xweb-user .twblock-btn,\r\n.twblock-btn-container.twblock-xweb-profile .twblock-btn,\r\n.twblock-btn-container.twblock-xweb-hover .twblock-btn {\r\n  border-radius: 50%;\r\n  border: 1px solid color-mix(in srgb, currentColor 15%, transparent);\r\n}\r\n\r\n.twblock-btn-container.twblock-xweb-user .twblock-btn:not(:hover):not(.twblock-success),\r\n.twblock-btn-container.twblock-xweb-profile .twblock-btn:not(:hover):not(.twblock-success),\r\n.twblock-btn-container.twblock-xweb-hover .twblock-btn:not(:hover):not(.twblock-success) {\r\n  color: inherit;\r\n}\r\n\r\n/* ユーザー行: Follow は 32px（h-8）。行は名前の塊と Follow の justify-between なので、\r\n   auto マージンで Follow 側へ寄せる。行の gap は 12px（gap-3）で、こちらの内側の\r\n   8px と揃えるため右へ 4px 詰める */\r\n.twblock-btn-container.twblock-xweb-user {\r\n  margin-left: auto;\r\n  margin-right: -4px;\r\n}\r\n\r\n.twblock-btn-container.twblock-xweb-user .twblock-btn {\r\n  width: 32px;\r\n  height: 32px;\r\n}\r\n\r\n.twblock-btn-container.twblock-xweb-user .twblock-btn svg {\r\n  width: 16px;\r\n  height: 16px;\r\n}\r\n\r\n/* プロフィールとホバーカード: 隣のメッセージ等と同じ 36px（h-9）、アイコン 18px */\r\n.twblock-btn-container.twblock-xweb-profile .twblock-btn,\r\n.twblock-btn-container.twblock-xweb-hover .twblock-btn {\r\n  width: 36px;\r\n  height: 36px;\r\n}\r\n\r\n.twblock-btn-container.twblock-xweb-profile .twblock-btn svg,\r\n.twblock-btn-container.twblock-xweb-hover .twblock-btn svg {\r\n  width: 18px;\r\n  height: 18px;\r\n}\r\n\r\n/* スマホ幅で操作行に入りきらないとき（content.js の fitProfileRow が付ける）:\r\n   X の [もっと見る][メッセージ][通知][Follow] は1行のまま、こちらはその下の行に右寄せ */\r\n.twblock-btn-container.twblock-xweb-profile.twblock-xweb-below {\r\n  order: 99;\r\n  flex-basis: 100%;\r\n  justify-content: flex-end;\r\n}\r\n\r\n/* ホバーカード: Followボタンとの間隔を少し広めに */\r\n.twblock-btn-container.twblock-hovercard + * {\r\n  margin-left: 8px !important;\r\n}\r\n\r\n/* ホバーカードの行は 64px のアバターが高さを決めていて align-items: stretch。\r\n   X の Followボタン(36px)はその箱の上端に置かれるので、共通の center 揃えの\r\n   ままだと自分のボタンだけ 14px 下にずれる（実測: 中心 719 対 705）。\r\n   X と同じく上端に寄せ、36pxのpillと32pxの丸の差 (36-32)/2 を足して中心を揃える */\r\n.twblock-btn-container.twblock-hovercard {\r\n  align-items: flex-start;\r\n  padding-top: 2px;\r\n}\r\n\r\n\r\n/* 個別ボタン（デフォルト: 34x34, アイコン20x20） */\r\n.twblock-btn {\r\n  display: inline-flex;\r\n  align-items: center;\r\n  justify-content: center;\r\n  width: 34px;\r\n  height: 34px;\r\n  border-radius: 50%;\r\n  border: none;\r\n  background: transparent;\r\n  cursor: pointer;\r\n  padding: 0;\r\n  transition: background-color 0.15s ease, color 0.15s ease;\r\n  color: light-dark(rgb(83, 100, 113), rgb(113, 118, 123));\r\n  outline: none;\r\n}\r\n\r\n.twblock-btn:focus-visible {\r\n  box-shadow: 0 0 0 2px rgb(29, 155, 240);\r\n}\r\n\r\n.twblock-btn svg {\r\n  width: 20px;\r\n  height: 20px;\r\n  fill: currentColor;\r\n  pointer-events: none;\r\n}\r\n\r\n/* ブロックボタン: ホバーで赤 */\r\n.twblock-block:hover:not(:disabled) {\r\n  background-color: rgba(244, 33, 46, 0.1);\r\n  color: rgb(244, 33, 46);\r\n}\r\n\r\n/* ミュートボタン: ホバーでオレンジ */\r\n.twblock-mute:hover:not(:disabled) {\r\n  background-color: rgba(255, 173, 31, 0.1);\r\n  color: rgb(255, 173, 31);\r\n}\r\n\r\n/* ローディング状態 */\r\n.twblock-loading {\r\n  opacity: 0.5;\r\n  pointer-events: none;\r\n}\r\n\r\n.twblock-loading svg {\r\n  animation: twblock-spin 0.8s linear infinite;\r\n}\r\n\r\n@keyframes twblock-spin {\r\n  from { transform: rotate(0deg); }\r\n  to { transform: rotate(360deg); }\r\n}\r\n\r\n/* 成功状態: 緑 (クリックで解除可能) */\r\n.twblock-success {\r\n  color: rgb(0, 186, 124) !important;\r\n}\r\n\r\n/* 解除のホバー色は、その操作の色に合わせる */\r\n.twblock-block.twblock-success:hover {\r\n  background-color: rgba(244, 33, 46, 0.1) !important;\r\n  color: rgb(244, 33, 46) !important;\r\n}\r\n\r\n.twblock-mute.twblock-success:hover {\r\n  background-color: rgba(255, 173, 31, 0.1) !important;\r\n  color: rgb(255, 173, 31) !important;\r\n}\r\n\r\n/* エラー状態 */\r\n.twblock-error {\r\n  color: rgb(244, 33, 46) !important;\r\n  animation: twblock-shake 0.3s ease;\r\n}\r\n\r\n@keyframes twblock-shake {\r\n  0%, 100% { transform: translateX(0); }\r\n  25% { transform: translateX(-3px); }\r\n  75% { transform: translateX(3px); }\r\n}\r\n\r\n/* 引用ツイートのカードは min-height:64px を持っていて、畳むと 57px のバーだけが残る。\r\n   flex の縦並びなので余りが全部下に落ち、下だけ 5px 長く見える。\r\n   畳んだ親は可視の子がバー1枚だけなので、中央に置いて差を分ける。\r\n   横並びの親では主軸が水平で、バーが width:100% なので何も起きない */\r\n[data-twblock-collapsed] {\r\n  justify-content: center;\r\n}\r\n\r\n/* ---- ブロック/ミュート後の非表示バー ---- */\r\n/* 畳んだ投稿の中身。JSでも display:none を入れているが、画像の遅延ロードのように\r\n   後から足される子はここで隠す。これが無いと隠し直すために毎フレーム走ることになる */\r\n[data-twblock-collapsed] > *:not(.twblock-hidden-bar) {\r\n  display: none !important;\r\n}\r\n\r\n.twblock-hidden-bar {\r\n  display: flex;\r\n  align-items: center;\r\n  /* X の reset は自前のクラスにしか box-sizing を当てないので、こちらは\r\n     初期値の content-box のままになる。width:100% と padding が足し算になり、\r\n     cellInnerDiv のような伸び縮みしない親では右へ32pxはみ出して、\r\n     右端に寄せたボタンがツイートの外に出る */\r\n  box-sizing: border-box;\r\n  /* 幅いっぱいに広げたので、center だと文字が真ん中に飛ぶ。本文と同じ左寄せ */\r\n  justify-content: flex-start;\r\n  flex-wrap: wrap;\r\n  gap: 8px 12px;\r\n  padding: 14px 16px;\r\n  font-family: -apple-system, BlinkMacSystemFont, \"Segoe UI\", Roboto, Helvetica, Arial, sans-serif;\r\n  /* article[data-testid=\"tweet\"] は flex の行なので、指定しないと文字幅まで縮む。\r\n     縮むと下線も文字の下だけになり、X のセル区切り線と1px差で二重に見える。\r\n     区切り線は X 側が持っているので、こちらは線を引かない */\r\n  width: 100%;\r\n}\r\n\r\n.twblock-hidden-label {\r\n  color: rgb(113, 118, 123);\r\n  font-size: 14px;\r\n}\r\n\r\n/* ボタン群は行の右端へ。ブロック/ミュートを押した直後のカーソルがそこにいる */\r\n.twblock-hidden-bar:not(.twblock-notice-bar) .twblock-show-btn:first-of-type {\r\n  margin-left: auto;\r\n}\r\n\r\n.twblock-show-btn {\r\n  background: none;\r\n  border: 1px solid light-dark(rgb(207, 217, 222), rgb(83, 100, 113));\r\n  border-radius: 16px;\r\n  color: light-dark(rgb(15, 20, 26), rgb(239, 243, 244));\r\n  font-size: 13px;\r\n  padding: 4px 14px;\r\n  cursor: pointer;\r\n  transition: background-color 0.15s ease;\r\n  white-space: nowrap;\r\n}\r\n\r\n.twblock-show-btn:hover:not(:disabled) {\r\n  background-color: light-dark(rgba(15, 20, 25, 0.1), rgba(239, 243, 244, 0.1));\r\n}\r\n\r\n.twblock-show-btn:disabled {\r\n  opacity: 0.5;\r\n  cursor: default;\r\n}\r\n\r\n/* ミュート→ブロックの切り替え */\r\n.twblock-show-btn.twblock-bar-danger {\r\n  border-color: rgba(244, 33, 46, 0.5);\r\n  color: rgb(244, 33, 46);\r\n}\r\n\r\n.twblock-show-btn.twblock-bar-danger:hover:not(:disabled) {\r\n  background-color: rgba(244, 33, 46, 0.1);\r\n}\r\n\r\n/* API側で解除できないときの逃げ道 */\r\n.twblock-show-btn.twblock-bar-force {\r\n  border-style: dashed;\r\n  color: rgb(113, 118, 123);\r\n}\r\n\r\n/* ---- プロフィールでブロックした直後の通知バー ----\r\n   X 純正の「You have muted posts from this account. Unmute」に合わせる。\r\n   枠も背景も持たず、15px/20px のグレー本文＋アクセント色のテキストリンク。\r\n   採寸値: color rgb(113,118,123) / link rgb(29,155,240) / margin 12px 0 / padding 0 */\r\n.twblock-notice-bar {\r\n  display: block;\r\n  margin: 12px 0;\r\n  padding: 0;\r\n  border: none;\r\n  font-size: 15px;\r\n  line-height: 20px;\r\n}\r\n\r\n.twblock-notice-bar .twblock-hidden-label {\r\n  font-size: 15px;\r\n  line-height: 20px;\r\n}\r\n\r\n.twblock-notice-bar .twblock-show-btn {\r\n  border: none;\r\n  border-radius: 0;\r\n  padding: 0;\r\n  margin-left: 8px;\r\n  background: none;\r\n  font-size: 15px;\r\n  line-height: 20px;\r\n  color: var(--twblock-accent, rgb(29, 155, 240));\r\n}\r\n\r\n.twblock-notice-bar .twblock-show-btn:hover:not(:disabled) {\r\n  background: none;\r\n  text-decoration: underline;\r\n}\r\n\r\n/* ---- トースト通知 ---- */\r\n.twblock-toast {\r\n  position: fixed;\r\n  bottom: 40px;\r\n  left: 50%;\r\n  transform: translateX(-50%);\r\n  background: rgb(29, 155, 240);\r\n  color: rgb(255, 255, 255);\r\n  padding: 12px 24px;\r\n  border-radius: 4px;\r\n  font-size: 15px;\r\n  font-family: -apple-system, BlinkMacSystemFont, \"Segoe UI\", Roboto, sans-serif;\r\n  z-index: 10000;\r\n  animation: twblock-toast-in 0.3s ease;\r\n}\r\n\r\n.twblock-toast-hide {\r\n  opacity: 0;\r\n  transition: opacity 0.3s ease;\r\n}\r\n\r\n@keyframes twblock-toast-in {\r\n  from { opacity: 0; transform: translateX(-50%) translateY(10px); }\r\n  to { opacity: 1; transform: translateX(-50%) translateY(0); }\r\n}\r\n";
     (document.head || document.documentElement).appendChild(style);
   }
 
@@ -1192,8 +1192,20 @@
     );
   });
 
+  // x-web は自分の名前を DOM に出さない（classic の AppTabBar_Profile_Link が無い）。
+  // サーバーがログイン中のページに埋める __INITIAL_DATA__.viewerScreenName を渡す
+  function xwebViewer() {
+    try {
+      const d = window.__INITIAL_DATA__;
+      const name = d && d.viewerScreenName;
+      return typeof name === 'string' && /^[A-Za-z0-9_]{1,15}$/.test(name) ? name : null;
+    } catch (err) {
+      return null;
+    }
+  }
+
   // 準備完了を通知
-  window.postMessage({ type: '__TWBLOCK_READY' }, '*');
+  window.postMessage({ type: '__TWBLOCK_READY', viewer: xwebViewer() }, '*');
 })();
   }
 
@@ -1274,6 +1286,12 @@
     if (e.data.type === '__TWBLOCK_READY') {
       pageScriptReady = true;
       while (readyWaiters.length) readyWaiters.shift()();
+      const viewer = e.data.viewer;
+      if (typeof viewer === 'string' && /^[A-Za-z0-9_]{1,15}$/.test(viewer) && viewer !== xwebViewer) {
+        xwebViewer = viewer;
+        // 自分の投稿や行に先に付けたボタンを外す
+        if (!myScreenName) rescanAll();
+      }
       return;
     }
     if (e.data.type !== '__TWBLOCK_RESULT') return;
@@ -1345,6 +1363,8 @@
   }
 
   let myScreenName = null;
+  // x-web では pageScript が __INITIAL_DATA__ から教えてくれる（メッセージブリッジ参照）
+  let xwebViewer = null;
   function getMyScreenName() {
     if (myScreenName) return myScreenName;
     const navLink = document.querySelector('a[data-testid="AppTabBar_Profile_Link"]');
@@ -1352,7 +1372,7 @@
       const href = navLink.getAttribute('href');
       if (href) { myScreenName = href.replace('/', ''); return myScreenName; }
     }
-    return null;
+    return xwebViewer;
   }
 
   function isMe(screenName) {
@@ -2203,11 +2223,14 @@
   }
 
   // ヘッダー右端の「もっと見る」。エンゲージメント行のリポスト/共有も
-  // aria-haspopup="menu" を持つので、アイコン名で選ぶ
+  // aria-haspopup="menu" を持つので、アイコン名で選ぶ。
+  // リポストは元の投稿をもう1段 article で包むので、article ではなく
+  // entry 単位で自分のものか見る（引用カードは別の entry なので除かれる）
   function findXwebMoreButton(article) {
+    const entry = article.parentElement;
     for (const icon of article.querySelectorAll('svg[data-icon="icon-more"]')) {
       const btn = icon.closest('button');
-      if (btn && btn.closest('article') === article) return btn;
+      if (btn && btn.closest('[data-timeline-entry]') === entry) return btn;
     }
     return null;
   }
@@ -2259,6 +2282,154 @@
       if (primaryAction(getUserState(author)) && !isViewingProfileTimeline(author)) {
         hideElement(article, author);
       }
+    });
+  }
+
+  // ---- x-web: ユーザー行・プロフィールの操作行・ホバーカード ----
+  // ログイン中の x-web はまだ一般には配られていないので、構造は x-web 本体を
+  // オフラインで動かすハーネス（tests/xweb-harness）で採った。
+  //  ユーザー行: [data-timeline-entry][data-href="/<名前>"] の中に article が無いもの。
+  //    名前の塊と Follow 系ボタンが justify-between の行に並ぶ
+  //    （フォロー一覧・検索のユーザー・おすすめ・ブロック/ミュート一覧が同じ形）
+  //  Follow 系ボタン: aria-label が "Follow @x" / "Unfollow @x" / "Unblock @x" のように
+  //    末尾が対象の @名前。ホバーカードだけは "Follow" で名前が付かない
+  const USER_PATH_RE = /^\/([A-Za-z0-9_]{1,15})$/;
+
+  // まだフォローしていない人の Follow は aria-label が "Follow" だけで名前が無く、
+  // 文言は表示言語で変わる。名前で見つからなければ並び（形）で決める
+  function findXwebFollowButton(scope, screenName) {
+    const key = nameKey(screenName);
+    for (const btn of scope.querySelectorAll('button[aria-label]')) {
+      if (btn.closest('.twblock-btn-container')) continue;
+      const m = btn.getAttribute('aria-label').match(/@([A-Za-z0-9_]{1,15})$/);
+      if (m && nameKey(m[1]) === key) return btn;
+    }
+    return null;
+  }
+
+  // ユーザー行: 名前のリンクと同じ行（親が同じ）にある最後のボタン
+  function findXwebCellAction(entry, screenName) {
+    const key = nameKey(screenName);
+    const buttons = [...entry.querySelectorAll('button')].filter((b) => !b.closest('.twblock-btn-container'));
+    for (let i = buttons.length - 1; i >= 0; i--) {
+      const row = buttons[i].parentElement;
+      if (!row) continue;
+      for (const a of row.querySelectorAll('a[href]')) {
+        if (nameKey(a.getAttribute('href')) === '/' + key && !buttons[i].contains(a)) return buttons[i];
+      }
+    }
+    return null;
+  }
+
+  // プロフィールの操作行: アイコンだけのボタン（もっと見る・メッセージ・通知）の後ろの、
+  // 文字のボタンが Follow 系
+  function findXwebProfileFollow(row) {
+    const kids = [...row.children].filter((el) => el.tagName === 'BUTTON' && !el.querySelector('svg'));
+    return kids.length ? kids[kids.length - 1] : null;
+  }
+
+  // row の直下に screenName のコンテナを1つだけ置き、before の直前に並べる。
+  // before が null なら行の先頭。X の要素は動かさない（React の差分が壊れる）
+  function placeXwebContainer(row, before, screenName, kind) {
+    let container = null;
+    row.querySelectorAll(':scope > .twblock-btn-container').forEach((el) => {
+      if (!container && nameKey(el.getAttribute('data-screen-name')) === nameKey(screenName)) container = el;
+      else el.remove();
+    });
+    if (!container) {
+      container = createButtons(screenName);
+      if (!container) return;
+      container.classList.add(kind);
+    }
+    const anchor = before || row.firstElementChild;
+    if (container !== anchor && container.nextElementSibling !== anchor) row.insertBefore(container, anchor);
+    syncContainer(container, screenName);
+    return container;
+  }
+
+  // スマホ幅では操作行（flex-wrap）に入りきらず、Follow だけが次の行へ落ちる。
+  // そのときはこちらを丸ごと行の下に回し、X の並びは1行のまま残す。
+  // 入るかどうかは行の幅が変わったときだけ測る
+  const watchedProfileRows = new WeakSet();
+  function fitProfileRow(row, container) {
+    const cs = getComputedStyle(row);
+    const gap = parseFloat(cs.columnGap) || 0;
+    let total = 0;
+    let n = 0;
+    for (const el of row.children) {
+      if (getComputedStyle(el).position === 'absolute') continue;
+      if (el === container) {
+        const btns = [...el.children];
+        btns.forEach((b) => { total += b.getBoundingClientRect().width; });
+        total += (parseFloat(getComputedStyle(el).columnGap) || 0) * Math.max(btns.length - 1, 0);
+      } else {
+        total += el.getBoundingClientRect().width;
+      }
+      n++;
+    }
+    total += gap * Math.max(n - 1, 0);
+    container.classList.toggle('twblock-xweb-below', total > row.clientWidth + 0.5);
+  }
+  function watchProfileRow(row, container) {
+    fitProfileRow(row, container);
+    if (watchedProfileRows.has(row) || typeof ResizeObserver !== 'function') return;
+    watchedProfileRows.add(row);
+    new ResizeObserver(() => {
+      const c = row.querySelector(':scope > .twblock-btn-container.twblock-xweb-profile');
+      if (c) fitProfileRow(row, c);
+    }).observe(row);
+  }
+
+  function processXwebUserCells() {
+    document.querySelectorAll('[data-timeline-entry][data-href]').forEach((entry) => {
+      const m = (entry.getAttribute('data-href') || '').match(USER_PATH_RE);
+      if (!m || entry.querySelector('article')) return;
+      const screenName = m[1];
+      if (isMe(screenName)) return;
+      // 通知の「〇〇さんがフォローしました」なども /<名前> を持つが Follow ボタンが無い
+      const follow = findXwebFollowButton(entry, screenName) || findXwebCellAction(entry, screenName);
+      if (!follow || !follow.parentElement) return;
+      placeXwebContainer(follow.parentElement, follow, screenName, 'twblock-xweb-user');
+    });
+  }
+
+  // 操作行: [もっと見る][メッセージ][通知][Follow]。classic と同じく Follow の直前に置く
+  function processXwebProfileHeader() {
+    const screenName = getProfileScreenName();
+    if (!screenName || isMe(screenName)) return;
+    for (const icon of document.querySelectorAll('button[aria-haspopup="menu"] svg[data-icon="icon-more-dots-hor"]')) {
+      const more = icon.closest('button');
+      if (more.closest('[data-timeline-entry], [data-side], .twblock-btn-container')) continue;
+      const row = more.parentElement;
+      let follow = findXwebFollowButton(row, screenName);
+      if (!follow || follow.parentElement !== row) follow = findXwebProfileFollow(row);
+      if (!follow) continue;
+      const container = placeXwebContainer(row, follow, screenName, 'twblock-xweb-profile');
+      if (container) watchProfileRow(row, container);
+      return;
+    }
+  }
+
+  // ホバーカードは body 直下のポップアップ（data-side を持つ）。先頭の行が
+  // [アバター][メッセージ・Follow の塊] なので、塊の先頭に置く
+  function processXwebHoverCards() {
+    document.querySelectorAll('[data-side][data-open]').forEach((popup) => {
+      let avatar = null;
+      for (const a of popup.querySelectorAll('a[href]')) {
+        if (USER_PATH_RE.test(a.getAttribute('href')) && a.querySelector('img')) { avatar = a; break; }
+      }
+      if (!avatar || !avatar.parentElement) return;
+      const screenName = avatar.getAttribute('href').match(USER_PATH_RE)[1];
+      if (isMe(screenName)) return;
+      let group = null;
+      for (const el of avatar.parentElement.children) {
+        if (el !== avatar && !el.classList.contains('twblock-btn-container') && el.querySelector('button')) { group = el; break; }
+      }
+      if (!group) return;
+      const first = group.firstElementChild && group.firstElementChild.classList.contains('twblock-btn-container')
+        ? group.firstElementChild.nextElementSibling
+        : group.firstElementChild;
+      placeXwebContainer(group, first, screenName, 'twblock-xweb-hover');
     });
   }
 
@@ -2449,6 +2620,9 @@
     try { processFollowButtons(); } catch (err) { console.warn('[twblock] processFollowButtons', err); }
     try { processTypeahead(); } catch (err) { console.warn('[twblock] processTypeahead', err); }
     try { processXweb(); } catch (err) { console.warn('[twblock] processXweb', err); }
+    try { processXwebUserCells(); } catch (err) { console.warn('[twblock] processXwebUserCells', err); }
+    try { processXwebProfileHeader(); } catch (err) { console.warn('[twblock] processXwebProfileHeader', err); }
+    try { processXwebHoverCards(); } catch (err) { console.warn('[twblock] processXwebHoverCards', err); }
     // 描画途中で取れなかった要素は、次の変化を待たずに自分で拾い直す。
     // （以前は X が出し続ける無関係な変化がフォールバックを兼ねていた）
     if (document.querySelector('[' + RETRY_ATTR + ']')) schedulePass(RETRY_PASS_DELAY);
@@ -2466,8 +2640,10 @@
       for (let j = 0; j < added.length; j++) {
         const node = added[j];
         if (node.nodeType !== 1) continue;
-        if (node.hasAttribute('data-testid') || node.hasAttribute('data-timeline-entry')) return true;
-        if (node.firstElementChild && node.querySelector('[data-testid], [data-timeline-entry]')) return true;
+        // x-web: data-side はホバーカード、data-slot は Follow などのボタン（押すと作り直される）
+        if (node.hasAttribute('data-testid') || node.hasAttribute('data-timeline-entry') ||
+            node.hasAttribute('data-side') || node.getAttribute('data-slot') === 'xds-button') return true;
+        if (node.firstElementChild && node.querySelector('[data-testid], [data-timeline-entry], [data-side], [data-slot="xds-button"]')) return true;
       }
     }
     return false;

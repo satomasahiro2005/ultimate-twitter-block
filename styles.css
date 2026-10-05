@@ -307,6 +307,67 @@ article [data-timeline-entry] > article > .twblock-hidden-bar {
   height: 18px;
 }
 
+/* ---- x-web（ログイン中）: ユーザー行・プロフィール・ホバーカード ----
+   x-web の輪郭ボタン（メッセージ・もっと見る・Following）と同じ形にする。
+   色は x-web が外に出していないので、x-web の投稿ボタンと同じく文字色から作る */
+.twblock-btn-container.twblock-xweb-user,
+.twblock-btn-container.twblock-xweb-profile,
+.twblock-btn-container.twblock-xweb-hover {
+  gap: 8px;
+}
+
+.twblock-btn-container.twblock-xweb-user .twblock-btn,
+.twblock-btn-container.twblock-xweb-profile .twblock-btn,
+.twblock-btn-container.twblock-xweb-hover .twblock-btn {
+  border-radius: 50%;
+  border: 1px solid color-mix(in srgb, currentColor 15%, transparent);
+}
+
+.twblock-btn-container.twblock-xweb-user .twblock-btn:not(:hover):not(.twblock-success),
+.twblock-btn-container.twblock-xweb-profile .twblock-btn:not(:hover):not(.twblock-success),
+.twblock-btn-container.twblock-xweb-hover .twblock-btn:not(:hover):not(.twblock-success) {
+  color: inherit;
+}
+
+/* ユーザー行: Follow は 32px（h-8）。行は名前の塊と Follow の justify-between なので、
+   auto マージンで Follow 側へ寄せる。行の gap は 12px（gap-3）で、こちらの内側の
+   8px と揃えるため右へ 4px 詰める */
+.twblock-btn-container.twblock-xweb-user {
+  margin-left: auto;
+  margin-right: -4px;
+}
+
+.twblock-btn-container.twblock-xweb-user .twblock-btn {
+  width: 32px;
+  height: 32px;
+}
+
+.twblock-btn-container.twblock-xweb-user .twblock-btn svg {
+  width: 16px;
+  height: 16px;
+}
+
+/* プロフィールとホバーカード: 隣のメッセージ等と同じ 36px（h-9）、アイコン 18px */
+.twblock-btn-container.twblock-xweb-profile .twblock-btn,
+.twblock-btn-container.twblock-xweb-hover .twblock-btn {
+  width: 36px;
+  height: 36px;
+}
+
+.twblock-btn-container.twblock-xweb-profile .twblock-btn svg,
+.twblock-btn-container.twblock-xweb-hover .twblock-btn svg {
+  width: 18px;
+  height: 18px;
+}
+
+/* スマホ幅で操作行に入りきらないとき（content.js の fitProfileRow が付ける）:
+   X の [もっと見る][メッセージ][通知][Follow] は1行のまま、こちらはその下の行に右寄せ */
+.twblock-btn-container.twblock-xweb-profile.twblock-xweb-below {
+  order: 99;
+  flex-basis: 100%;
+  justify-content: flex-end;
+}
+
 /* ホバーカード: Followボタンとの間隔を少し広めに */
 .twblock-btn-container.twblock-hovercard + * {
   margin-left: 8px !important;

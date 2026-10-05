@@ -235,6 +235,18 @@
     );
   });
 
+  // x-web は自分の名前を DOM に出さない（classic の AppTabBar_Profile_Link が無い）。
+  // サーバーがログイン中のページに埋める __INITIAL_DATA__.viewerScreenName を渡す
+  function xwebViewer() {
+    try {
+      const d = window.__INITIAL_DATA__;
+      const name = d && d.viewerScreenName;
+      return typeof name === 'string' && /^[A-Za-z0-9_]{1,15}$/.test(name) ? name : null;
+    } catch (err) {
+      return null;
+    }
+  }
+
   // 準備完了を通知
-  window.postMessage({ type: '__TWBLOCK_READY' }, '*');
+  window.postMessage({ type: '__TWBLOCK_READY', viewer: xwebViewer() }, '*');
 })();

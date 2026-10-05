@@ -989,6 +989,12 @@
     if (e.data.type === '__TWBLOCK_READY') {
       pageScriptReady = true;
       while (readyWaiters.length) readyWaiters.shift()();
+      const viewer = e.data.viewer;
+      if (typeof viewer === 'string' && /^[A-Za-z0-9_]{1,15}$/.test(viewer) && viewer !== xwebViewer) {
+        xwebViewer = viewer;
+        // 自分の投稿や行に先に付けたボタンを外す
+        if (!myScreenName) rescanAll();
+      }
       return;
     }
     if (e.data.type !== '__TWBLOCK_RESULT') return;
@@ -1060,6 +1066,8 @@
   }
 
   let myScreenName = null;
+  // x-web では pageScript が __INITIAL_DATA__ から教えてくれる（メッセージブリッジ参照）
+  let xwebViewer = null;
   function getMyScreenName() {
     if (myScreenName) return myScreenName;
     const navLink = document.querySelector('a[data-testid="AppTabBar_Profile_Link"]');
@@ -1067,7 +1075,7 @@
       const href = navLink.getAttribute('href');
       if (href) { myScreenName = href.replace('/', ''); return myScreenName; }
     }
-    return null;
+    return xwebViewer;
   }
 
   function isMe(screenName) {
@@ -1918,11 +1926,14 @@
   }
 
   // ヘッダー右端の「もっと見る」。エンゲージメント行のリポスト/共有も
-  // aria-haspopup="menu" を持つので、アイコン名で選ぶ
+  // aria-haspopup="menu" を持つので、アイコン名で選ぶ。
+  // リポストは元の投稿をもう1段 article で包むので、article ではなく
+  // entry 単位で自分のものか見る（引用カードは別の entry なので除かれる）
   function findXwebMoreButton(article) {
+    const entry = article.parentElement;
     for (const icon of article.querySelectorAll('svg[data-icon="icon-more"]')) {
       const btn = icon.closest('button');
-      if (btn && btn.closest('article') === article) return btn;
+      if (btn && btn.closest('[data-timeline-entry]') === entry) return btn;
     }
     return null;
   }
@@ -1974,6 +1985,154 @@
       if (primaryAction(getUserState(author)) && !isViewingProfileTimeline(author)) {
         hideElement(article, author);
       }
+    });
+  }
+
+  // ---- x-web: ユーザー行・プロフィールの操作行・ホバーカード ----
+  // ログイン中の x-web はまだ一般には配られていないので、構造は x-web 本体を
+  // オフラインで動かすハーネス（tests/xweb-harness）で採った。
+  //  ユーザー行: [data-timeline-entry][data-href="/<名前>"] の中に article が無いもの。
+  //    名前の塊と Follow 系ボタンが justify-between の行に並ぶ
+  //    （フォロー一覧・検索のユーザー・おすすめ・ブロック/ミュート一覧が同じ形）
+  //  Follow 系ボタン: aria-label が "Follow @x" / "Unfollow @x" / "Unblock @x" のように
+  //    末尾が対象の @名前。ホバーカードだけは "Follow" で名前が付かない
+  const USER_PATH_RE = /^\/([A-Za-z0-9_]{1,15})$/;
+
+  // まだフォローしていない人の Follow は aria-label が "Follow" だけで名前が無く、
+  // 文言は表示言語で変わる。名前で見つからなければ並び（形）で決める
+  function findXwebFollowButton(scope, screenName) {
+    const key = nameKey(screenName);
+    for (const btn of scope.querySelectorAll('button[aria-label]')) {
+      if (btn.closest('.twblock-btn-container')) continue;
+      const m = btn.getAttribute('aria-label').match(/@([A-Za-z0-9_]{1,15})$/);
+      if (m && nameKey(m[1]) === key) return btn;
+    }
+    return null;
+  }
+
+  // ユーザー行: 名前のリンクと同じ行（親が同じ）にある最後のボタン
+  function findXwebCellAction(entry, screenName) {
+    const key = nameKey(screenName);
+    const buttons = [...entry.querySelectorAll('button')].filter((b) => !b.closest('.twblock-btn-container'));
+    for (let i = buttons.length - 1; i >= 0; i--) {
+      const row = buttons[i].parentElement;
+      if (!row) continue;
+      for (const a of row.querySelectorAll('a[href]')) {
+        if (nameKey(a.getAttribute('href')) === '/' + key && !buttons[i].contains(a)) return buttons[i];
+      }
+    }
+    return null;
+  }
+
+  // プロフィールの操作行: アイコンだけのボタン（もっと見る・メッセージ・通知）の後ろの、
+  // 文字のボタンが Follow 系
+  function findXwebProfileFollow(row) {
+    const kids = [...row.children].filter((el) => el.tagName === 'BUTTON' && !el.querySelector('svg'));
+    return kids.length ? kids[kids.length - 1] : null;
+  }
+
+  // row の直下に screenName のコンテナを1つだけ置き、before の直前に並べる。
+  // before が null なら行の先頭。X の要素は動かさない（React の差分が壊れる）
+  function placeXwebContainer(row, before, screenName, kind) {
+    let container = null;
+    row.querySelectorAll(':scope > .twblock-btn-container').forEach((el) => {
+      if (!container && nameKey(el.getAttribute('data-screen-name')) === nameKey(screenName)) container = el;
+      else el.remove();
+    });
+    if (!container) {
+      container = createButtons(screenName);
+      if (!container) return;
+      container.classList.add(kind);
+    }
+    const anchor = before || row.firstElementChild;
+    if (container !== anchor && container.nextElementSibling !== anchor) row.insertBefore(container, anchor);
+    syncContainer(container, screenName);
+    return container;
+  }
+
+  // スマホ幅では操作行（flex-wrap）に入りきらず、Follow だけが次の行へ落ちる。
+  // そのときはこちらを丸ごと行の下に回し、X の並びは1行のまま残す。
+  // 入るかどうかは行の幅が変わったときだけ測る
+  const watchedProfileRows = new WeakSet();
+  function fitProfileRow(row, container) {
+    const cs = getComputedStyle(row);
+    const gap = parseFloat(cs.columnGap) || 0;
+    let total = 0;
+    let n = 0;
+    for (const el of row.children) {
+      if (getComputedStyle(el).position === 'absolute') continue;
+      if (el === container) {
+        const btns = [...el.children];
+        btns.forEach((b) => { total += b.getBoundingClientRect().width; });
+        total += (parseFloat(getComputedStyle(el).columnGap) || 0) * Math.max(btns.length - 1, 0);
+      } else {
+        total += el.getBoundingClientRect().width;
+      }
+      n++;
+    }
+    total += gap * Math.max(n - 1, 0);
+    container.classList.toggle('twblock-xweb-below', total > row.clientWidth + 0.5);
+  }
+  function watchProfileRow(row, container) {
+    fitProfileRow(row, container);
+    if (watchedProfileRows.has(row) || typeof ResizeObserver !== 'function') return;
+    watchedProfileRows.add(row);
+    new ResizeObserver(() => {
+      const c = row.querySelector(':scope > .twblock-btn-container.twblock-xweb-profile');
+      if (c) fitProfileRow(row, c);
+    }).observe(row);
+  }
+
+  function processXwebUserCells() {
+    document.querySelectorAll('[data-timeline-entry][data-href]').forEach((entry) => {
+      const m = (entry.getAttribute('data-href') || '').match(USER_PATH_RE);
+      if (!m || entry.querySelector('article')) return;
+      const screenName = m[1];
+      if (isMe(screenName)) return;
+      // 通知の「〇〇さんがフォローしました」なども /<名前> を持つが Follow ボタンが無い
+      const follow = findXwebFollowButton(entry, screenName) || findXwebCellAction(entry, screenName);
+      if (!follow || !follow.parentElement) return;
+      placeXwebContainer(follow.parentElement, follow, screenName, 'twblock-xweb-user');
+    });
+  }
+
+  // 操作行: [もっと見る][メッセージ][通知][Follow]。classic と同じく Follow の直前に置く
+  function processXwebProfileHeader() {
+    const screenName = getProfileScreenName();
+    if (!screenName || isMe(screenName)) return;
+    for (const icon of document.querySelectorAll('button[aria-haspopup="menu"] svg[data-icon="icon-more-dots-hor"]')) {
+      const more = icon.closest('button');
+      if (more.closest('[data-timeline-entry], [data-side], .twblock-btn-container')) continue;
+      const row = more.parentElement;
+      let follow = findXwebFollowButton(row, screenName);
+      if (!follow || follow.parentElement !== row) follow = findXwebProfileFollow(row);
+      if (!follow) continue;
+      const container = placeXwebContainer(row, follow, screenName, 'twblock-xweb-profile');
+      if (container) watchProfileRow(row, container);
+      return;
+    }
+  }
+
+  // ホバーカードは body 直下のポップアップ（data-side を持つ）。先頭の行が
+  // [アバター][メッセージ・Follow の塊] なので、塊の先頭に置く
+  function processXwebHoverCards() {
+    document.querySelectorAll('[data-side][data-open]').forEach((popup) => {
+      let avatar = null;
+      for (const a of popup.querySelectorAll('a[href]')) {
+        if (USER_PATH_RE.test(a.getAttribute('href')) && a.querySelector('img')) { avatar = a; break; }
+      }
+      if (!avatar || !avatar.parentElement) return;
+      const screenName = avatar.getAttribute('href').match(USER_PATH_RE)[1];
+      if (isMe(screenName)) return;
+      let group = null;
+      for (const el of avatar.parentElement.children) {
+        if (el !== avatar && !el.classList.contains('twblock-btn-container') && el.querySelector('button')) { group = el; break; }
+      }
+      if (!group) return;
+      const first = group.firstElementChild && group.firstElementChild.classList.contains('twblock-btn-container')
+        ? group.firstElementChild.nextElementSibling
+        : group.firstElementChild;
+      placeXwebContainer(group, first, screenName, 'twblock-xweb-hover');
     });
   }
 
@@ -2164,6 +2323,9 @@
     try { processFollowButtons(); } catch (err) { console.warn('[twblock] processFollowButtons', err); }
     try { processTypeahead(); } catch (err) { console.warn('[twblock] processTypeahead', err); }
     try { processXweb(); } catch (err) { console.warn('[twblock] processXweb', err); }
+    try { processXwebUserCells(); } catch (err) { console.warn('[twblock] processXwebUserCells', err); }
+    try { processXwebProfileHeader(); } catch (err) { console.warn('[twblock] processXwebProfileHeader', err); }
+    try { processXwebHoverCards(); } catch (err) { console.warn('[twblock] processXwebHoverCards', err); }
     // 描画途中で取れなかった要素は、次の変化を待たずに自分で拾い直す。
     // （以前は X が出し続ける無関係な変化がフォールバックを兼ねていた）
     if (document.querySelector('[' + RETRY_ATTR + ']')) schedulePass(RETRY_PASS_DELAY);
@@ -2181,8 +2343,10 @@
       for (let j = 0; j < added.length; j++) {
         const node = added[j];
         if (node.nodeType !== 1) continue;
-        if (node.hasAttribute('data-testid') || node.hasAttribute('data-timeline-entry')) return true;
-        if (node.firstElementChild && node.querySelector('[data-testid], [data-timeline-entry]')) return true;
+        // x-web: data-side はホバーカード、data-slot は Follow などのボタン（押すと作り直される）
+        if (node.hasAttribute('data-testid') || node.hasAttribute('data-timeline-entry') ||
+            node.hasAttribute('data-side') || node.getAttribute('data-slot') === 'xds-button') return true;
+        if (node.firstElementChild && node.querySelector('[data-testid], [data-timeline-entry], [data-side], [data-slot="xds-button"]')) return true;
       }
     }
     return false;
