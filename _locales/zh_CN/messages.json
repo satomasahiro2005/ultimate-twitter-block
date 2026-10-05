@@ -61,6 +61,7 @@
 
   "switchToBlockLabel": { "message": "切换为屏蔽" },
   "forceShowLabel": { "message": "强制显示" },
+  "showPostLabel": { "message": "显示" },
   "reloadLabel": { "message": "刷新显示" },
   "errorNoAuth": { "message": "无法获取登录信息。请先在页面上操作后重试。" },
   "errorForbidden": { "message": "会话已过期。请重新载入页面。" },

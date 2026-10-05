@@ -212,7 +212,7 @@
 
   const I18N_CACHE_KEYS = [
     'blockLabel', 'muteLabel', 'blockedStatus', 'mutedStatus',
-    'unblockLabel', 'unmuteLabel', 'switchToBlockLabel', 'forceShowLabel',
+    'unblockLabel', 'unmuteLabel', 'switchToBlockLabel', 'forceShowLabel', 'showPostLabel',
     'reloadLabel',
     'errorTimeout', 'errorOccurred', 'errorNoAuth', 'errorForbidden',
     'errorRateLimited', 'errorNetwork', 'errorHttp',
@@ -1075,6 +1075,13 @@
     return Boolean(me && screenName && nameKey(me) === nameKey(screenName));
   }
 
+  // ブロック/ミュートの API は ct0（X のCSRFトークン）が無いと通らない。
+  // ログアウト中は X が ct0 を消すので、押しても必ず失敗するボタンは出さない。
+  // pageScript の getHeaders も同じ cookie で判定している
+  function canAct() {
+    return /(?:^|;\s*)ct0=[^;]/.test(document.cookie);
+  }
+
   // ---- Twitterアクセントカラー取得 ----
   const ACCENT_COLORS = new Set([
     'rgb(29, 155, 240)',   // Blue
@@ -1182,7 +1189,16 @@
     label.textContent = options.nameless ? statusLabel : statusLabel + ' @' + screenName;
     bar.appendChild(label);
 
-    if (options.undo !== false) {
+    // ログアウト中は解除も切替も API が通らない。記録には触れず、この投稿だけ開く
+    if (options.undo !== false && !canAct()) {
+      const showBtn = makeBarButton(msg('showPostLabel'));
+      showBtn.addEventListener('click', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        closeStateBar(bar);
+      });
+      bar.appendChild(showBtn);
+    } else if (options.undo !== false) {
     // ミュート済みからブロックへ切り替え（ボタンの押し間違い救済）。
     // ブロックボタンを隠す設定は「TLを散らかしたくない」であって
     // 「ブロックしない」ではないので、ここには出す
@@ -1394,7 +1410,7 @@
 
   // ---- ボタン作成 ----
   function createButtons(screenName) {
-    if (!showBlock && !showMute) return null;
+    if (!showAnyButton()) return null;
 
     const container = document.createElement('div');
     container.className = 'twblock-btn-container';
@@ -1570,6 +1586,7 @@
 
   // ツイート本文エリアからscreen_nameを抽出（socialContext内のリンクを除外）
   function extractAuthorScreenName(tweet) {
+    if (isXwebArticle(tweet)) return extractXwebAuthor(tweet);
     const userName = tweet.querySelector('[data-testid="User-Name"]');
     if (userName) {
       const result = extractScreenName(userName);
@@ -1707,7 +1724,7 @@
   }
 
   function showAnyButton() {
-    return showBlock || showMute;
+    return (showBlock || showMute) && canAct();
   }
 
   // ---- ボタン挿入: タイムラインツイート ----
@@ -1852,6 +1869,110 @@
       const blockedAction = primaryAction(getUserState(qtScreenName));
       if (blockedAction && !isViewingProfileTimeline(qtScreenName)) {
         hideQuotedTweet(block, qtScreenName);
+      }
+    });
+  }
+
+  // ---- x-web（ログアウト中に配られる新しいフロント） ----
+  // 応答ヘッダーが x-server: x-web で、data-testid を1つも持たない。
+  // 投稿は [data-timeline-entry] > article で、引用カードは投稿の article の中に
+  // もう1段 [data-timeline-entry] > article として入る。一覧の entry は
+  // data-href="/<著者>/status/<id>" を持つ（会話ページの本体だけは持たない）
+  const XWEB_ARTICLE_SELECTOR = '[data-timeline-entry] > article';
+  const STATUS_PATH_RE = /^\/([A-Za-z0-9_]{1,15})\/status\/\d+$/;
+
+  function isXwebArticle(article) {
+    const entry = article.parentElement;
+    return Boolean(entry && entry.hasAttribute('data-timeline-entry'));
+  }
+
+  // スマホ幅では投稿へのリンクが https://m.x.com/<著者>/status/<id>?launch_app_store=true
+  // の絶対URLになる（ユーザーへのリンクは /<名前> のまま）。X のURLなら path だけを見る
+  function statusAuthorFromHref(href) {
+    if (!href) return null;
+    let pathname = href;
+    if (href.charAt(0) !== '/') {
+      try {
+        const url = new URL(href);
+        if (!/(^|\.)(x|twitter)\.com$/.test(url.hostname)) return null;
+        pathname = url.pathname;
+      } catch (err) {
+        return null;
+      }
+    }
+    const m = pathname.match(STATUS_PATH_RE);
+    return m ? m[1] : null;
+  }
+
+  function extractXwebAuthor(article) {
+    const entry = article.parentElement;
+    const own = statusAuthorFromHref(entry.getAttribute('data-href'));
+    if (own) return own;
+    // 会話ページの本体: 日時のリンクが /<著者>/status/<id>。引用カードの中のリンクは除く
+    for (const link of article.querySelectorAll('a[href*="/status/"]')) {
+      if (link.closest('[data-timeline-entry]') !== entry) continue;
+      const author = statusAuthorFromHref(link.getAttribute('href'));
+      if (author) return author;
+    }
+    return null;
+  }
+
+  // ヘッダー右端の「もっと見る」。エンゲージメント行のリポスト/共有も
+  // aria-haspopup="menu" を持つので、アイコン名で選ぶ
+  function findXwebMoreButton(article) {
+    for (const icon of article.querySelectorAll('svg[data-icon="icon-more"]')) {
+      const btn = icon.closest('button');
+      if (btn && btn.closest('article') === article) return btn;
+    }
+    return null;
+  }
+
+  function placeXwebPostButtons(article, screenName) {
+    const more = findXwebMoreButton(article);
+    if (!more || hasOwnContainer(more.parentElement)) return;
+    const buttons = createButtons(screenName);
+    if (!buttons) return;
+    buttons.classList.add('twblock-tweet', 'twblock-xweb');
+    more.parentElement.insertBefore(buttons, more);
+    syncContainer(buttons, screenName);
+  }
+
+  // 引用カードには「もっと見る」が無い。アバターと名前の行の右端に置く
+  function placeXwebQuotedButtons(article, screenName) {
+    const key = nameKey(screenName);
+    let row = null;
+    for (const link of article.querySelectorAll('a[href]')) {
+      if (nameKey(link.getAttribute('href')) === '/' + key) { row = link.parentElement; break; }
+    }
+    if (!row || row === article || hasOwnContainer(row)) return;
+    const buttons = createButtons(screenName);
+    if (!buttons) return;
+    buttons.classList.add('twblock-tweet', 'twblock-xweb');
+    buttons.style.marginLeft = 'auto';
+    buttons.style.paddingLeft = '8px';
+    row.appendChild(buttons);
+    syncContainer(buttons, screenName);
+  }
+
+  function processXweb() {
+    const articles = document.querySelectorAll(XWEB_ARTICLE_SELECTOR + ':not([' + PROCESSED + '])');
+    articles.forEach((article) => {
+      const author = extractXwebAuthor(article);
+      if (!author) {
+        if (!countRetry(article)) article.setAttribute(PROCESSED, '1');
+        return;
+      }
+      article.setAttribute(PROCESSED, '1');
+      article.removeAttribute(RETRY_ATTR);
+      if (isMe(author)) return;
+
+      const quoted = Boolean(article.parentElement.closest('article'));
+      article.setAttribute(quoted ? QUOTED_ATTR : AUTHOR_ATTR, nameKey(author));
+      if (quoted) placeXwebQuotedButtons(article, author);
+      else placeXwebPostButtons(article, author);
+
+      if (primaryAction(getUserState(author)) && !isViewingProfileTimeline(author)) {
+        hideElement(article, author);
       }
     });
   }
@@ -2042,6 +2163,7 @@
     try { processTweets(); } catch (err) { console.warn('[twblock] processTweets', err); }
     try { processFollowButtons(); } catch (err) { console.warn('[twblock] processFollowButtons', err); }
     try { processTypeahead(); } catch (err) { console.warn('[twblock] processTypeahead', err); }
+    try { processXweb(); } catch (err) { console.warn('[twblock] processXweb', err); }
     // 描画途中で取れなかった要素は、次の変化を待たずに自分で拾い直す。
     // （以前は X が出し続ける無関係な変化がフォールバックを兼ねていた）
     if (document.querySelector('[' + RETRY_ATTR + ']')) schedulePass(RETRY_PASS_DELAY);
@@ -2052,14 +2174,15 @@
   // 1秒に200回近く childList を動かす。全部に反応すると processAll が毎フレーム走り、
   // その仕事がキー入力と同じフレームに乗る。実測: 何もしていない画面で 44回/秒。
   // 仕事があるのは「data-testid を持つ要素が増えた」ときだけなので、そこで切る。
+  // x-web は data-testid を持たないので、投稿の入れ物（data-timeline-entry）も見る
   function isRelevant(records) {
     for (let i = 0; i < records.length; i++) {
       const added = records[i].addedNodes;
       for (let j = 0; j < added.length; j++) {
         const node = added[j];
         if (node.nodeType !== 1) continue;
-        if (node.hasAttribute('data-testid')) return true;
-        if (node.firstElementChild && node.querySelector('[data-testid]')) return true;
+        if (node.hasAttribute('data-testid') || node.hasAttribute('data-timeline-entry')) return true;
+        if (node.firstElementChild && node.querySelector('[data-testid], [data-timeline-entry]')) return true;
       }
     }
     return false;
@@ -2112,7 +2235,14 @@
       myScreenName = null;
       rescanAll();
     }
+    // ログイン/ログアウトでボタンの有無とバーの中身が変わる
+    const authed = canAct();
+    if (authed !== lastAuthed) {
+      lastAuthed = authed;
+      rescanAll();
+    }
   }
+  let lastAuthed = canAct();
 
   // ---- ストレージ変更のリアルタイム反映 ----
   store.onChanged((changes) => {

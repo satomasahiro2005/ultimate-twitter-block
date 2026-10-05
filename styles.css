@@ -117,6 +117,85 @@ div:has([data-testid$="-follow"], [data-testid$="-unfollow"]) > .twblock-btn-con
 }
 
 
+/* ---- x-web（ログアウト中の新しいフロント）に馴染ませる ----
+   x-web は色を CSS 変数で外に出していないので、行の文字色（テーマで白/黒が変わる）
+   から作る。実測（ダーク）: 本文 #fff / 補足 rgba(255,255,255,.6) /
+   輪郭 rgba(255,255,255,.15)。ライトでも同じ比率で黒から作られる */
+
+/* ボタン: ヘッダー右端の「もっと見る」と同じ 32px の丸。アイコンは
+   エンゲージメント行と同じ 18px で、色も「もっと見る」と同じ本文色。
+   -8px は「もっと見る」と同じ -my-2（行の高さを押し広げない） */
+.twblock-btn-container.twblock-xweb {
+  gap: 0;
+  margin: -8px 0;
+}
+
+.twblock-btn-container.twblock-xweb .twblock-btn {
+  width: 32px;
+  height: 32px;
+}
+
+.twblock-btn-container.twblock-xweb .twblock-btn:not(:hover):not(.twblock-success) {
+  color: inherit;
+}
+
+.twblock-btn-container.twblock-xweb .twblock-btn svg {
+  width: 18px;
+  height: 18px;
+}
+
+.twblock-btn-container.twblock-xweb .twblock-btn::before {
+  width: 32px;
+  height: 32px;
+  margin: -16px;
+}
+
+.twblock-btn-container.twblock-xweb .twblock-btn::after {
+  width: 32px;
+  height: 32px;
+  margin: -16px;
+}
+
+/* 畳んだ投稿のバー。投稿の余白は外側の entry（px-horizontal py-vertical）が持つので、
+   こちらは余白を足さず、アバターの左端に文字をそろえる */
+[data-timeline-entry] > article > .twblock-hidden-bar {
+  padding: 0;
+  min-height: 32px;
+  font-family: inherit;
+}
+
+/* 引用カードの中は X 自身が 12px（p-3）の余白を取っている */
+article [data-timeline-entry] > article > .twblock-hidden-bar {
+  padding: 12px;
+}
+
+[data-timeline-entry] > article > .twblock-hidden-bar .twblock-hidden-label {
+  color: color-mix(in srgb, currentColor 60%, transparent);
+  font-size: 15px;
+  line-height: 20px;
+}
+
+/* X の輪郭ボタン（「@ポスト」など）を 32px にしたもの */
+[data-timeline-entry] > article > .twblock-hidden-bar .twblock-show-btn {
+  height: 32px;
+  padding: 0 16px;
+  border-radius: 9999px;
+  font-family: inherit;
+  font-size: 14px;
+  font-weight: 500;
+  line-height: 16px;
+}
+
+/* 「ブロックに切替」の赤だけは残す */
+[data-timeline-entry] > article > .twblock-hidden-bar .twblock-show-btn:not(.twblock-bar-danger) {
+  border-color: color-mix(in srgb, currentColor 15%, transparent);
+  color: inherit;
+}
+
+[data-timeline-entry] > article > .twblock-hidden-bar .twblock-show-btn:hover:not(:disabled) {
+  background-color: color-mix(in srgb, currentColor 10%, transparent);
+}
+
 /* RT("reposted")行の親をflex-rowに変更して横並びにする */
 .twblock-repost-row {
   flex-direction: row !important;

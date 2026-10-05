@@ -1046,6 +1046,162 @@ function check(name, ok, detail) {
     check('ホバーカード: Follow の直前に置かれる', hover.beforeFollow === true, JSON.stringify(hover));
     check('ホバーカード: Follow と中心が揃う', hover.gap <= 1, `ずれ ${hover.gap}px`);
 
+    // ---------------------------------------------------------------
+    // 15. x-web（ログアウト中に配られる新しいフロント）
+    //     data-testid が無く、投稿は [data-timeline-entry] > article。
+    //     サンプルは実際の会話ページ（本体 + 引用 + 返信3件）を匿名化したもの
+    // ---------------------------------------------------------------
+    const xwebSample = fs.readFileSync(path.join(__dirname, 'xweb-status.html'), 'utf8');
+    const mountXweb = (html, url) => page.evaluate((html, url) => {
+      window.reset();
+      history.replaceState({}, '', url || '/xw_author/status/1002');
+      // SPA の遷移と同じく、出来上がった木をまとめて差し込む
+      const holder = document.createElement('div');
+      holder.innerHTML = html;
+      document.getElementById('root').appendChild(holder);
+    }, html, url);
+
+    await page.evaluate(() => { document.cookie = 'ct0=testcsrftoken; path=/'; window.__apiReply = { success: true }; });
+    await mountXweb(xwebSample);
+    await page.evaluate(() => new Promise((r) => setTimeout(r, 500)));
+
+    const xweb = await page.evaluate(() => {
+      const tops = [...document.querySelectorAll('[data-timeline-entry] > article')]
+        .filter((a) => !a.parentElement.closest('article'));
+      const quote = document.querySelector('article [data-timeline-entry] > article');
+      return {
+        authors: tops.map((a) => a.getAttribute('data-twblock-author')),
+        // ボタンは「もっと見る」の直前に1つ。X のボタンは包み直さない
+        beforeMore: tops.map((a) => {
+          const conts = [...a.querySelectorAll('.twblock-btn-container')].filter((c) => !c.closest('[data-twblock-quoted]'));
+          const more = a.querySelector('button[aria-label="もっと見る"]');
+          return conts.length === 1 && conts[0].nextElementSibling === more &&
+            conts[0].getAttribute('data-screen-name') === a.getAttribute('data-twblock-author');
+        }),
+        quoted: quote && quote.getAttribute('data-twblock-quoted'),
+        quoteButtons: quote ? [...quote.querySelectorAll('.twblock-btn-container')].map((c) => c.getAttribute('data-screen-name')) : null,
+        quoteRowHasAvatar: Boolean(quote && quote.querySelector('.twblock-btn-container')
+          && quote.querySelector('.twblock-btn-container').parentElement.querySelector('.x-avatar')),
+      };
+    });
+    check('x-web: 本体と返信の著者を取れる（本体は data-href が無く日時のリンクから）',
+      JSON.stringify(xweb.authors) === '["xw_author","xw_reply1","xw_reply2","xw_reply3"]', JSON.stringify(xweb.authors));
+    check('x-web: 各投稿の「もっと見る」の直前にボタンが1つ', xweb.beforeMore.every(Boolean), JSON.stringify(xweb.beforeMore));
+    check('x-web: 引用カードを引用として扱う', xweb.quoted === 'xw_quoted', xweb.quoted);
+    check('x-web: 引用カードのボタンはアバターと名前の行に1つ',
+      JSON.stringify(xweb.quoteButtons) === '["xw_quoted"]' && xweb.quoteRowHasAvatar, JSON.stringify(xweb));
+
+    // ログイン中なら x-web でも従来どおり API を叩いて畳む
+    await page.evaluate(() => {
+      document.querySelector('article[data-twblock-author="xw_reply1"] .twblock-mute').click();
+      document.querySelector('[data-twblock-quoted="xw_quoted"] .twblock-block').click();
+    });
+    await page.evaluate(() => new Promise((r) => setTimeout(r, 900)));
+    const xwebActed = await page.evaluate(() => {
+      const reply = document.querySelector('article[data-twblock-author="xw_reply1"]');
+      const quote = document.querySelector('[data-twblock-quoted="xw_quoted"]');
+      return {
+        replyBar: reply.firstElementChild.classList.contains('twblock-hidden-bar'),
+        quoteBar: quote.firstElementChild.classList.contains('twblock-hidden-bar'),
+        outerOpen: !document.querySelector('article[data-twblock-author="xw_author"]').hasAttribute('data-twblock-collapsed'),
+        calls: window.__apiCalls.filter((c) => /mutes\/users\/create|blocks\/create/.test(c.url)).length,
+      };
+    });
+    check('x-web: ミュートした返信が畳まれる', xwebActed.replyBar, JSON.stringify(xwebActed));
+    check('x-web: ブロックした引用はカードだけ畳まれる', xwebActed.quoteBar && xwebActed.outerOpen, JSON.stringify(xwebActed));
+
+    // ログアウト: ct0 が消える。ボタンは出さず、記録済みの相手は畳んだまま
+    await page.evaluate(() => {
+      document.cookie = 'ct0=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT';
+      document.cookie = 'ct0=; expires=Thu, 01 Jan 1970 00:00:00 GMT';
+      window.__callsAtLogout = window.__apiCalls.length;
+    });
+    await page.evaluate(() => new Promise((r) => setTimeout(r, 1500)));
+    const loggedOut = await page.evaluate(() => {
+      const reply = document.querySelector('article[data-twblock-author="xw_reply1"]');
+      const bar = reply.querySelector(':scope > .twblock-hidden-bar');
+      const qbar = document.querySelector('[data-twblock-quoted="xw_quoted"] > .twblock-hidden-bar');
+      return {
+        noCookie: !/(?:^|;\s*)ct0=[^;]/.test(document.cookie),
+        containers: document.querySelectorAll('#root .twblock-btn-container').length,
+        // 文言は表示言語の設定（11b）に左右されるので、どれでもよい
+        replyButtons: bar ? [...bar.querySelectorAll('button')].map((b) => /^(Show|表示|显示)$/.test(b.textContent) ? 'show' : b.textContent) : null,
+        quoteButtons: qbar ? [...qbar.querySelectorAll('button')].map((b) => /^(Show|表示|显示)$/.test(b.textContent) ? 'show' : b.textContent) : null,
+      };
+    });
+    check('ログアウト: ct0 が消えている（前提）', loggedOut.noCookie);
+    check('ログアウト: 必ず失敗するブロック/ミュートボタンは出さない', loggedOut.containers === 0, `got ${loggedOut.containers}`);
+    check('ログアウト: 記録済みの返信は畳んだまま、バーは「表示」だけ',
+      JSON.stringify(loggedOut.replyButtons) === '["show"]', JSON.stringify(loggedOut.replyButtons));
+    check('ログアウト: 記録済みの引用も「表示」だけ',
+      JSON.stringify(loggedOut.quoteButtons) === '["show"]', JSON.stringify(loggedOut.quoteButtons));
+
+    // 「表示」はこの投稿を開くだけ。記録は消さず、API も叩かない
+    await page.evaluate(() => {
+      document.querySelector('article[data-twblock-author="xw_reply1"] > .twblock-hidden-bar button').click();
+    });
+    await page.evaluate(() => new Promise((r) => setTimeout(r, 400)));
+    const revealed = await page.evaluate(() => {
+      const reply = document.querySelector('article[data-twblock-author="xw_reply1"]');
+      return {
+        open: !reply.querySelector('.twblock-hidden-bar') && !reply.hasAttribute('data-twblock-collapsed') &&
+          [...reply.children].every((c) => getComputedStyle(c).display !== 'none'),
+        stored: JSON.parse(localStorage.getItem('twblock_blockedUsersV2') || '{}').xw_reply1,
+        newCalls: window.__apiCalls.length - window.__callsAtLogout,
+      };
+    });
+    check('ログアウト: 「表示」で中身が戻る', revealed.open, JSON.stringify(revealed));
+    check('ログアウト: 「表示」は記録を消さない', Boolean(revealed.stored && revealed.stored.m === 1), JSON.stringify(revealed.stored));
+    check('ログアウト: API を1度も叩いていない', revealed.newCalls === 0, `got ${revealed.newCalls}`);
+
+    // SPA で別の会話へ移ると木ごと差し替わる。data-testid が無くても拾い直す
+    await mountXweb(xwebSample);
+    await page.evaluate(() => new Promise((r) => setTimeout(r, 500)));
+    const remounted = await page.evaluate(() => ({
+      reply: Boolean(document.querySelector('article[data-twblock-author="xw_reply1"] > .twblock-hidden-bar')),
+      others: document.querySelectorAll('#root .twblock-hidden-bar').length,
+    }));
+    check('x-web: 差し替わった木でも記録済みの相手を畳む', remounted.reply && remounted.others === 2, JSON.stringify(remounted));
+
+    // スマホ幅: 投稿へのリンクと data-href が https://m.x.com/... の絶対URLになる
+    const xwebMobile = fs.readFileSync(path.join(__dirname, 'xweb-status-mobile.html'), 'utf8');
+    await mountXweb(xwebMobile);
+    await page.evaluate(() => new Promise((r) => setTimeout(r, 500)));
+    const mobile = await page.evaluate(() => ({
+      authors: [...document.querySelectorAll('[data-twblock-author]')].map((a) => a.getAttribute('data-twblock-author')),
+      quoted: [...document.querySelectorAll('[data-twblock-quoted]')].map((a) => a.getAttribute('data-twblock-quoted')),
+      bars: [...document.querySelectorAll('#root .twblock-hidden-bar')].map((b) => b.getAttribute('data-screen-name')),
+    }));
+    check('x-web(スマホ幅): 絶対URLからも著者を取れる',
+      JSON.stringify(mobile.authors) === '["xw_author","xw_reply1","xw_reply2","xw_reply3"]' &&
+      JSON.stringify(mobile.quoted) === '["xw_quoted"]', JSON.stringify(mobile));
+    check('x-web(スマホ幅): 記録済みの相手を畳む',
+      JSON.stringify(mobile.bars.sort()) === '["xw_quoted","xw_reply1"]', JSON.stringify(mobile.bars));
+
+    // 相手のプロフィールでは、その人の投稿は畳まない（従来と同じ）
+    await mountXweb(xwebSample, '/xw_reply1');
+    await page.evaluate(() => new Promise((r) => setTimeout(r, 500)));
+    const onProfile = await page.evaluate(() => ({
+      reply: Boolean(document.querySelector('article[data-twblock-author="xw_reply1"] > .twblock-hidden-bar')),
+      quote: Boolean(document.querySelector('[data-twblock-quoted="xw_quoted"] > .twblock-hidden-bar')),
+    }));
+    check('x-web: 本人のプロフィールではその人の投稿を畳まない', !onProfile.reply && onProfile.quote, JSON.stringify(onProfile));
+
+    // 再ログインで ct0 が戻ると、ボタンと「解除」のバーに戻る
+    await page.evaluate(() => { document.cookie = 'ct0=testcsrftoken; path=/'; });
+    await mountXweb(xwebSample);
+    await page.evaluate(() => new Promise((r) => setTimeout(r, 1500)));
+    const relogged = await page.evaluate(() => {
+      const bar = document.querySelector('article[data-twblock-author="xw_reply1"] > .twblock-hidden-bar');
+      return {
+        containers: document.querySelectorAll('#root .twblock-btn-container').length,
+        buttons: bar ? [...bar.querySelectorAll('button')].map((b) => b.classList.contains('twblock-bar-danger') ? 'switch' : 'undo') : null,
+      };
+    });
+    check('再ログイン: ボタンが戻る', relogged.containers === 5, `got ${relogged.containers}`);
+    check('再ログイン: バーが「ブロックに切替」「ミュート解除」に戻る',
+      JSON.stringify(relogged.buttons) === '["switch","undo"]', JSON.stringify(relogged.buttons));
+
 
   } finally {
     await browser.close();

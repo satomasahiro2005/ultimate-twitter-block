@@ -61,6 +61,7 @@
 
   "switchToBlockLabel": { "message": "ブロックに切替" },
   "forceShowLabel": { "message": "強制的に表示" },
+  "showPostLabel": { "message": "表示" },
   "reloadLabel": { "message": "表示を更新" },
   "errorNoAuth": { "message": "認証情報が取得できません。ページを操作してから再試行してください。" },
   "errorForbidden": { "message": "セッションが期限切れです。ページを再読み込みしてください。" },

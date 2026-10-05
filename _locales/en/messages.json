@@ -61,6 +61,7 @@
 
   "switchToBlockLabel": { "message": "Switch to block" },
   "forceShowLabel": { "message": "Show anyway" },
+  "showPostLabel": { "message": "Show" },
   "reloadLabel": { "message": "Refresh view" },
   "errorNoAuth": { "message": "Could not read your session. Interact with the page and try again." },
   "errorForbidden": { "message": "Your session expired. Reload the page." },

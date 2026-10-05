@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Ultimate Twitter Block
 // @namespace    twitter-block-userscript
-// @version      2.3.9
+// @version      2.4.0
 // @description  Add one-click block/mute buttons to tweets, profiles, and search suggestions on Twitter/X
 // @author       nemut.ai
 // @match        https://x.com/*
@@ -164,7 +164,7 @@
 
   // ---- i18n（init時にキャッシュして、処理中は chrome.* を触らない） ----
   
-  const _M = {"en":{"extName":"Ultimate Twitter Block","extDescription":"Add one-click block & mute buttons to every tweet, retweet, quote tweet, and profile on Twitter/X. Native UI design.","blockLabel":"Block","muteLabel":"Mute","blockedStatus":"Blocked","mutedStatus":"Muted","unblockLabel":"Unblock","unmuteLabel":"Unmute","toastBlocked":"Blocked @$1","toastMuted":"Muted @$1","toastUnblocked":"Unblocked @$1","toastUnmuted":"Unmuted @$1","errorTimeout":"Timed out","errorOccurred":"An error occurred","popupDescription":"One-click block & mute from tweets and profiles","settingsLabel":"Settings","sectionButtons":"Button Display","showBlockButton":"Show block button","showMuteButton":"Show mute button","confirmBlockFollowingLabel":"Confirm before blocking followed users","confirmBlockFollowing":"You are following @$1. Block anyway?","sectionLanguage":"Language","languageFollowSite":"Follow Twitter","languageFollowBrowser":"Follow browser","sectionStats":"Statistics","statsBlockedLabel":"Blocked","statsMutedLabel":"Muted","resetStats":"Reset Statistics","sectionReset":"Reset","resetHint":"Reset everything (statistics, icons, settings, and the local block/mute history) to defaults","fullReset":"Full Reset Extension","confirmReset":"Reset all data (statistics and settings)?","switchToBlockLabel":"Switch to block","forceShowLabel":"Show anyway","reloadLabel":"Refresh view","errorNoAuth":"Could not read your session. Interact with the page and try again.","errorForbidden":"Your session expired. Reload the page.","errorRateLimited":"Rate limited. Wait a moment and try again.","errorNetwork":"Network error","reloadAfterProfileBlockLabel":"Reload the page after blocking from a profile","toastStateSynced":"Synced the state of @$1","errorHttp":"Request failed (HTTP $1)","confirmBlockUnknown":"Could not check whether you follow @$1. Block anyway?","supportLabel":"Support","versionLabel":"Version","supportTwitterLabel":"Twitter","supportGithubLabel":"GitHub"},"ja":{"extName":"Ultimate Twitter Block","extDescription":"Twitter/Xのタイムラインにワンクリックのブロック＆ミュートボタンを追加。ツイート・RT・引用RT・プロフィールに対応。","blockLabel":"ブロック","muteLabel":"ミュート","blockedStatus":"ブロック済み","mutedStatus":"ミュート済み","unblockLabel":"ブロック解除","unmuteLabel":"ミュート解除","toastBlocked":"@$1 をブロックしました","toastMuted":"@$1 をミュートしました","toastUnblocked":"@$1 のブロックを解除しました","toastUnmuted":"@$1 のミュートを解除しました","errorTimeout":"タイムアウトしました","errorOccurred":"エラーが発生しました","popupDescription":"ツイートやプロフィールに表示されるボタンでワンクリックブロック＆ミュート","settingsLabel":"設定","sectionButtons":"ボタン表示","showBlockButton":"ブロックボタンを表示","showMuteButton":"ミュートボタンを表示","confirmBlockFollowingLabel":"フォロー中のユーザーをブロックする前に確認する","confirmBlockFollowing":"@$1 はフォロー中です。ブロックしますか？","sectionLanguage":"表示言語","languageFollowSite":"Twitterに合わせる","languageFollowBrowser":"ブラウザに合わせる","sectionStats":"統計","statsBlockedLabel":"ブロック","statsMutedLabel":"ミュート","resetStats":"統計をリセット","sectionReset":"リセット","resetHint":"統計・アイコン・設定・ブロック/ミュートのローカル記録をすべて初期状態に戻します","fullReset":"拡張機能を完全リセット","confirmReset":"すべてのデータ（統計・設定）をリセットしますか？","switchToBlockLabel":"ブロックに切替","forceShowLabel":"強制的に表示","reloadLabel":"表示を更新","errorNoAuth":"認証情報が取得できません。ページを操作してから再試行してください。","errorForbidden":"セッションが期限切れです。ページを再読み込みしてください。","errorRateLimited":"レート制限に達しました。しばらく待ってから再試行してください。","errorNetwork":"通信エラーが発生しました","reloadAfterProfileBlockLabel":"プロフィールでブロックしたらページを再読み込みする","toastStateSynced":"@$1 の状態を同期しました","errorHttp":"リクエストが失敗しました (HTTP $1)","confirmBlockUnknown":"@$1 をフォローしているか確認できませんでした。ブロックしますか？","supportLabel":"サポート","versionLabel":"バージョン","supportTwitterLabel":"Twitter","supportGithubLabel":"GitHub"},"zh_CN":{"extName":"Ultimate Twitter Block","extDescription":"在 Twitter/X 上为每条推文、转发、引用推文和个人资料添加一键屏蔽与隐藏按钮。原生界面风格。","blockLabel":"屏蔽","muteLabel":"隐藏","blockedStatus":"已屏蔽","mutedStatus":"已隐藏","unblockLabel":"取消屏蔽","unmuteLabel":"取消隐藏","toastBlocked":"已屏蔽 @$1","toastMuted":"已隐藏 @$1","toastUnblocked":"已对 @$1 取消屏蔽","toastUnmuted":"已对 @$1 取消隐藏","errorTimeout":"请求超时","errorOccurred":"发生错误","popupDescription":"在推文和个人资料中一键屏蔽与隐藏","settingsLabel":"设置","sectionButtons":"按钮显示","showBlockButton":"显示屏蔽按钮","showMuteButton":"显示隐藏按钮","confirmBlockFollowingLabel":"屏蔽已关注用户前先确认","confirmBlockFollowing":"你已关注 @$1。仍要屏蔽吗？","sectionLanguage":"显示语言","languageFollowSite":"跟随 Twitter","languageFollowBrowser":"跟随浏览器","sectionStats":"统计","statsBlockedLabel":"屏蔽","statsMutedLabel":"隐藏","resetStats":"重置统计","sectionReset":"重置","resetHint":"将统计、图标、设置以及本地的屏蔽/隐藏记录全部恢复为默认值","fullReset":"完全重置扩展","confirmReset":"要重置所有数据（统计和设置）吗？","switchToBlockLabel":"切换为屏蔽","forceShowLabel":"强制显示","reloadLabel":"刷新显示","errorNoAuth":"无法获取登录信息。请先在页面上操作后重试。","errorForbidden":"会话已过期。请重新载入页面。","errorRateLimited":"已达到频率限制。请稍后再试。","errorNetwork":"网络错误","reloadAfterProfileBlockLabel":"在个人资料页屏蔽后重新载入页面","toastStateSynced":"已同步 @$1 的状态","errorHttp":"请求失败 (HTTP $1)","confirmBlockUnknown":"无法确认你是否关注 @$1。仍要屏蔽吗？","supportLabel":"支持","versionLabel":"版本","supportTwitterLabel":"Twitter","supportGithubLabel":"GitHub"}};
+  const _M = {"en":{"extName":"Ultimate Twitter Block","extDescription":"Add one-click block & mute buttons to every tweet, retweet, quote tweet, and profile on Twitter/X. Native UI design.","blockLabel":"Block","muteLabel":"Mute","blockedStatus":"Blocked","mutedStatus":"Muted","unblockLabel":"Unblock","unmuteLabel":"Unmute","toastBlocked":"Blocked @$1","toastMuted":"Muted @$1","toastUnblocked":"Unblocked @$1","toastUnmuted":"Unmuted @$1","errorTimeout":"Timed out","errorOccurred":"An error occurred","popupDescription":"One-click block & mute from tweets and profiles","settingsLabel":"Settings","sectionButtons":"Button Display","showBlockButton":"Show block button","showMuteButton":"Show mute button","confirmBlockFollowingLabel":"Confirm before blocking followed users","confirmBlockFollowing":"You are following @$1. Block anyway?","sectionLanguage":"Language","languageFollowSite":"Follow Twitter","languageFollowBrowser":"Follow browser","sectionStats":"Statistics","statsBlockedLabel":"Blocked","statsMutedLabel":"Muted","resetStats":"Reset Statistics","sectionReset":"Reset","resetHint":"Reset everything (statistics, icons, settings, and the local block/mute history) to defaults","fullReset":"Full Reset Extension","confirmReset":"Reset all data (statistics and settings)?","switchToBlockLabel":"Switch to block","forceShowLabel":"Show anyway","showPostLabel":"Show","reloadLabel":"Refresh view","errorNoAuth":"Could not read your session. Interact with the page and try again.","errorForbidden":"Your session expired. Reload the page.","errorRateLimited":"Rate limited. Wait a moment and try again.","errorNetwork":"Network error","reloadAfterProfileBlockLabel":"Reload the page after blocking from a profile","toastStateSynced":"Synced the state of @$1","errorHttp":"Request failed (HTTP $1)","confirmBlockUnknown":"Could not check whether you follow @$1. Block anyway?","supportLabel":"Support","versionLabel":"Version","supportTwitterLabel":"Twitter","supportGithubLabel":"GitHub"},"ja":{"extName":"Ultimate Twitter Block","extDescription":"Twitter/Xのタイムラインにワンクリックのブロック＆ミュートボタンを追加。ツイート・RT・引用RT・プロフィールに対応。","blockLabel":"ブロック","muteLabel":"ミュート","blockedStatus":"ブロック済み","mutedStatus":"ミュート済み","unblockLabel":"ブロック解除","unmuteLabel":"ミュート解除","toastBlocked":"@$1 をブロックしました","toastMuted":"@$1 をミュートしました","toastUnblocked":"@$1 のブロックを解除しました","toastUnmuted":"@$1 のミュートを解除しました","errorTimeout":"タイムアウトしました","errorOccurred":"エラーが発生しました","popupDescription":"ツイートやプロフィールに表示されるボタンでワンクリックブロック＆ミュート","settingsLabel":"設定","sectionButtons":"ボタン表示","showBlockButton":"ブロックボタンを表示","showMuteButton":"ミュートボタンを表示","confirmBlockFollowingLabel":"フォロー中のユーザーをブロックする前に確認する","confirmBlockFollowing":"@$1 はフォロー中です。ブロックしますか？","sectionLanguage":"表示言語","languageFollowSite":"Twitterに合わせる","languageFollowBrowser":"ブラウザに合わせる","sectionStats":"統計","statsBlockedLabel":"ブロック","statsMutedLabel":"ミュート","resetStats":"統計をリセット","sectionReset":"リセット","resetHint":"統計・アイコン・設定・ブロック/ミュートのローカル記録をすべて初期状態に戻します","fullReset":"拡張機能を完全リセット","confirmReset":"すべてのデータ（統計・設定）をリセットしますか？","switchToBlockLabel":"ブロックに切替","forceShowLabel":"強制的に表示","showPostLabel":"表示","reloadLabel":"表示を更新","errorNoAuth":"認証情報が取得できません。ページを操作してから再試行してください。","errorForbidden":"セッションが期限切れです。ページを再読み込みしてください。","errorRateLimited":"レート制限に達しました。しばらく待ってから再試行してください。","errorNetwork":"通信エラーが発生しました","reloadAfterProfileBlockLabel":"プロフィールでブロックしたらページを再読み込みする","toastStateSynced":"@$1 の状態を同期しました","errorHttp":"リクエストが失敗しました (HTTP $1)","confirmBlockUnknown":"@$1 をフォローしているか確認できませんでした。ブロックしますか？","supportLabel":"サポート","versionLabel":"バージョン","supportTwitterLabel":"Twitter","supportGithubLabel":"GitHub"},"zh_CN":{"extName":"Ultimate Twitter Block","extDescription":"在 Twitter/X 上为每条推文、转发、引用推文和个人资料添加一键屏蔽与隐藏按钮。原生界面风格。","blockLabel":"屏蔽","muteLabel":"隐藏","blockedStatus":"已屏蔽","mutedStatus":"已隐藏","unblockLabel":"取消屏蔽","unmuteLabel":"取消隐藏","toastBlocked":"已屏蔽 @$1","toastMuted":"已隐藏 @$1","toastUnblocked":"已对 @$1 取消屏蔽","toastUnmuted":"已对 @$1 取消隐藏","errorTimeout":"请求超时","errorOccurred":"发生错误","popupDescription":"在推文和个人资料中一键屏蔽与隐藏","settingsLabel":"设置","sectionButtons":"按钮显示","showBlockButton":"显示屏蔽按钮","showMuteButton":"显示隐藏按钮","confirmBlockFollowingLabel":"屏蔽已关注用户前先确认","confirmBlockFollowing":"你已关注 @$1。仍要屏蔽吗？","sectionLanguage":"显示语言","languageFollowSite":"跟随 Twitter","languageFollowBrowser":"跟随浏览器","sectionStats":"统计","statsBlockedLabel":"屏蔽","statsMutedLabel":"隐藏","resetStats":"重置统计","sectionReset":"重置","resetHint":"将统计、图标、设置以及本地的屏蔽/隐藏记录全部恢复为默认值","fullReset":"完全重置扩展","confirmReset":"要重置所有数据（统计和设置）吗？","switchToBlockLabel":"切换为屏蔽","forceShowLabel":"强制显示","showPostLabel":"显示","reloadLabel":"刷新显示","errorNoAuth":"无法获取登录信息。请先在页面上操作后重试。","errorForbidden":"会话已过期。请重新载入页面。","errorRateLimited":"已达到频率限制。请稍后再试。","errorNetwork":"网络错误","reloadAfterProfileBlockLabel":"在个人资料页屏蔽后重新载入页面","toastStateSynced":"已同步 @$1 的状态","errorHttp":"请求失败 (HTTP $1)","confirmBlockUnknown":"无法确认你是否关注 @$1。仍要屏蔽吗？","supportLabel":"支持","versionLabel":"版本","supportTwitterLabel":"Twitter","supportGithubLabel":"GitHub"}};
   // 既定はブラウザの表示言語
   const _lang = (navigator.language || '').toLowerCase();
   const _L = _lang.indexOf('ja') === 0 ? 'ja' : (_lang.indexOf('zh') === 0 ? 'zh_CN' : 'en');
@@ -263,7 +263,7 @@
 
   const I18N_CACHE_KEYS = [
     'blockLabel', 'muteLabel', 'blockedStatus', 'mutedStatus',
-    'unblockLabel', 'unmuteLabel', 'switchToBlockLabel', 'forceShowLabel',
+    'unblockLabel', 'unmuteLabel', 'switchToBlockLabel', 'forceShowLabel', 'showPostLabel',
     'reloadLabel',
     'errorTimeout', 'errorOccurred', 'errorNoAuth', 'errorForbidden',
     'errorRateLimited', 'errorNetwork', 'errorHttp',
@@ -276,7 +276,7 @@
     if (document.getElementById('twblock-style')) return;
     const style = document.createElement('style');
     style.id = 'twblock-style';
-    style.textContent = "/* ========== Ultimate Twitter Block ========== */\r\n\r\n/* ボタンコンテナ（共通） */\r\n.twblock-btn-container {\r\n  display: flex;\r\n  align-items: center;\r\n  flex-shrink: 0;\r\n}\r\n\r\n/* ツイートヘッダー: Grok/caret行内に配置 (Grok/caretと同サイズ) */\r\n.twblock-btn-container.twblock-tweet {\r\n  flex: 0 0 auto;\r\n  gap: 8px;\r\n}\r\n\r\n.twblock-btn-container.twblock-tweet .twblock-btn {\r\n  width: 20px;\r\n  height: 20px;\r\n  position: relative;\r\n  overflow: visible;\r\n}\r\n\r\n/* ホバー時の丸は見た目専用。クリック判定は ::after が持つ */\r\n.twblock-btn-container.twblock-tweet .twblock-btn::before {\r\n  content: '';\r\n  position: absolute;\r\n  top: 50%;\r\n  left: 50%;\r\n  width: 34px;\r\n  height: 34px;\r\n  margin: -17px;\r\n  border-radius: 50%;\r\n  transition: background-color 0.15s ease;\r\n  pointer-events: none;\r\n}\r\n\r\n/* クリック判定を広げる。左右はボタン間の隙間(8px)の半分ずつだけ取り、\r\n   隣のボタンと取り合いにならないようにする */\r\n.twblock-btn-container.twblock-tweet .twblock-btn::after {\r\n  content: '';\r\n  position: absolute;\r\n  top: 50%;\r\n  left: 50%;\r\n  width: 28px;\r\n  height: 32px;\r\n  margin: -16px -14px;\r\n}\r\n\r\n/* 狭い画面ではヘッダーに Follow ボタンが出る。この行は上揃えのことがあり\r\n   （iPhone 実測）、背の高いものだけが下にはみ出す。行の揃え方に関係なく、\r\n   Follow や caret と中心を合わせる */\r\ndiv:has([data-testid$=\"-follow\"], [data-testid$=\"-unfollow\"]) > .twblock-btn-container.twblock-tweet:not(.twblock-repost) {\r\n  align-self: center;\r\n}\r\n\r\n/* Follow が 32px の pill で出るとき（PCの狭い窓）だけ、X のボタンと釣り合うように丸で囲う。\r\n   スマホの Follow は 24px で、そこに 32px の丸を付けると grok や ⋯ より大きい輪になり、\r\n   しかも上揃えの行で 4px 下にはみ出す。だから小さいときは素のアイコンのままにする。\r\n   pill かどうかは content.js が判定して .twblock-pill を付ける。\r\n   :has() も残してあるので、窓を広げて Follow が消えれば印が残っていても丸は消える */\r\ndiv:has([data-testid$=\"-follow\"], [data-testid$=\"-unfollow\"]) > .twblock-btn-container.twblock-tweet.twblock-pill:not(.twblock-repost) {\r\n  gap: 6px;\r\n}\r\n\r\ndiv:has([data-testid$=\"-follow\"], [data-testid$=\"-unfollow\"]) > .twblock-btn-container.twblock-tweet.twblock-pill:not(.twblock-repost) .twblock-btn {\r\n  width: 32px;\r\n  height: 32px;\r\n  /* 輪郭だけ Follow ボタンの色を薄く借りる。アイコン自体は caret や ⋯ と同じ灰色のまま\r\n     （--twblock-follow-tone は content.js が隣の Follow ボタンから実測して入れる） */\r\n  border: 1px solid color-mix(in srgb, var(--twblock-follow-tone, currentColor) 35%, transparent);\r\n  border-radius: 9999px;\r\n}\r\n\r\n/* ホバーの丸も同じ大きさに。margin は直径の半分（既定の -17px は 34px 用） */\r\ndiv:has([data-testid$=\"-follow\"], [data-testid$=\"-unfollow\"]) > .twblock-btn-container.twblock-tweet.twblock-pill:not(.twblock-repost) .twblock-btn::before {\r\n  width: 32px;\r\n  height: 32px;\r\n  margin: -16px;\r\n}\r\n\r\n/* この行では X の caret や ⋯ が白なので、アイコンもそれに合わせる（行から継承する）。\r\n   :not(:hover) にしてあるのは、ホバー時の赤/青を上書きしないため */\r\ndiv:has([data-testid$=\"-follow\"], [data-testid$=\"-unfollow\"]) > .twblock-btn-container.twblock-tweet.twblock-pill:not(.twblock-repost) .twblock-btn:not(:hover) {\r\n  color: inherit;\r\n}\r\n\r\n.twblock-btn-container.twblock-tweet .twblock-btn svg {\r\n  width: 18.75px;\r\n  height: 18.75px;\r\n  position: relative;\r\n}\r\n\r\n/* ツイートボタン: ホバー背景は::beforeで表示、ボタン自体は透明 */\r\n.twblock-btn-container.twblock-tweet .twblock-block:hover:not(:disabled),\r\n.twblock-btn-container.twblock-tweet .twblock-mute:hover:not(:disabled) {\r\n  background-color: transparent;\r\n}\r\n\r\n.twblock-btn-container.twblock-tweet .twblock-block:hover:not(:disabled)::before {\r\n  background-color: rgba(244, 33, 46, 0.1);\r\n}\r\n\r\n.twblock-btn-container.twblock-tweet .twblock-mute:hover:not(:disabled)::before {\r\n  background-color: rgba(255, 173, 31, 0.1);\r\n}\r\n\r\n.twblock-btn-container.twblock-tweet .twblock-success:hover {\r\n  background-color: transparent !important;\r\n}\r\n\r\n.twblock-btn-container.twblock-tweet .twblock-block.twblock-success:hover::before {\r\n  background-color: rgba(244, 33, 46, 0.1);\r\n}\r\n\r\n.twblock-btn-container.twblock-tweet .twblock-mute.twblock-success:hover::before {\r\n  background-color: rgba(255, 173, 31, 0.1);\r\n}\r\n\r\n\r\n/* RT(\"reposted\")行の親をflex-rowに変更して横並びにする */\r\n.twblock-repost-row {\r\n  flex-direction: row !important;\r\n  align-items: center;\r\n  gap: 4px;\r\n}\r\n\r\n/* RT(\"reposted\")行: テキスト(16px/20px line-height)とアイコンの中心を揃える */\r\n.twblock-btn-container.twblock-repost {\r\n  gap: 4px;\r\n  margin-top: -2px;\r\n  margin-bottom: -2px;\r\n}\r\n\r\n/* 行が詰まっているので丸い背景は出さないが、押せる範囲は確保する */\r\n.twblock-btn-container.twblock-repost .twblock-btn::before {\r\n  display: none;\r\n}\r\n\r\n.twblock-btn-container.twblock-repost .twblock-btn::after {\r\n  width: 24px;\r\n  height: 26px;\r\n  margin: -13px -12px;\r\n}\r\n\r\n/* プロフィール: Followボタンと同じ高さ(36px)の丸ボタン */\r\n.twblock-btn-container.twblock-profile {\r\n  gap: 8px;\r\n  align-self: flex-start;\r\n  margin-right: 8px;\r\n}\r\n\r\n/* X はプロフィールの操作行にボタンを後から足すことがある（サブスク等）。\r\n   Followボタンの直前に挿しても、後から生えたものがこちらとFollowの間に割り込むので、\r\n   同じプロフィールでもリロードのたびに並び順が変わる。\r\n   DOM上の位置に関係なく「X のボタン群 → こちら → Follow」に固定する。\r\n   :has() が無い環境では order を付けないでおく（付けるとFollowより右へ行ってしまう） */\r\n@supports selector(:has(*)) {\r\n  .twblock-btn-container.twblock-profile {\r\n    order: 1;\r\n  }\r\n\r\n  div:has(> .twblock-btn-container.twblock-profile) > [data-testid=\"placementTracking\"] {\r\n    order: 2;\r\n  }\r\n\r\n}\r\n\r\n.twblock-btn-container.twblock-profile .twblock-btn {\r\n  width: 36px;\r\n  height: 36px;\r\n  border-radius: 50%;\r\n  border: 1px solid light-dark(rgb(207, 217, 222), rgb(83, 100, 113));\r\n  color: light-dark(rgb(15, 20, 26), rgb(230, 233, 234));\r\n}\r\n\r\n.twblock-btn-container.twblock-profile .twblock-btn svg {\r\n  width: 20px;\r\n  height: 20px;\r\n}\r\n\r\n/* 検索候補(typeahead): Xボタンの左に配置 */\r\n.twblock-btn-container.twblock-typeahead {\r\n  gap: 4px;\r\n  flex-shrink: 0;\r\n  margin-left: auto;\r\n}\r\n\r\n.twblock-btn-container.twblock-typeahead .twblock-btn {\r\n  width: 20px;\r\n  height: 20px;\r\n}\r\n\r\n.twblock-btn-container.twblock-typeahead .twblock-btn svg {\r\n  width: 18px;\r\n  height: 18px;\r\n}\r\n\r\n/* サイドバー / フォロー一覧: 32px丸ボタン */\r\n.twblock-btn-container.twblock-sidebar {\r\n  gap: 4px;\r\n  flex-shrink: 0;\r\n  /* Verified Followers / Following の行は justify-content: space-between なので、\r\n     Followボタンと別のflexアイテムとして置くと空きスペースを山分けされて真ん中に飛ぶ。\r\n     auto マージンで余白を全部こちら側に吸わせて、Followボタンの隣に寄せる。\r\n     余白が無い行（Followers など）では 0 に解決されるので位置は変わらない */\r\n  margin-left: auto;\r\n}\r\n\r\n/* Followボタンを包み直す（reparent）とReactのDOM差分が壊れるので、\r\n   間隔は隣接兄弟セレクタだけで確保する（Issue #14）。\r\n   X 側は 12px だが、ここを 4px にすると v2.2.4（ラッパーで margin を 0 にして\r\n   gap:4px を当てていた）と同じ見た目になる。実ページで採寸して確認済み。\r\n   コンテナの直後は必ず Follow ボタンの親なので、他の要素には当たらない */\r\n.twblock-btn-container.twblock-sidebar + * {\r\n  margin-left: 4px !important;\r\n}\r\n\r\n.twblock-btn-container.twblock-sidebar .twblock-btn {\r\n  width: 32px;\r\n  height: 32px;\r\n  border-radius: 50%;\r\n  border: 1px solid light-dark(rgb(207, 217, 222), rgb(83, 100, 113));\r\n  color: light-dark(rgb(15, 20, 26), rgb(230, 233, 234));\r\n}\r\n\r\n.twblock-btn-container.twblock-sidebar .twblock-btn svg {\r\n  width: 18px;\r\n  height: 18px;\r\n}\r\n\r\n/* ホバーカード: Followボタンとの間隔を少し広めに */\r\n.twblock-btn-container.twblock-hovercard + * {\r\n  margin-left: 8px !important;\r\n}\r\n\r\n/* ホバーカードの行は 64px のアバターが高さを決めていて align-items: stretch。\r\n   X の Followボタン(36px)はその箱の上端に置かれるので、共通の center 揃えの\r\n   ままだと自分のボタンだけ 14px 下にずれる（実測: 中心 719 対 705）。\r\n   X と同じく上端に寄せ、36pxのpillと32pxの丸の差 (36-32)/2 を足して中心を揃える */\r\n.twblock-btn-container.twblock-hovercard {\r\n  align-items: flex-start;\r\n  padding-top: 2px;\r\n}\r\n\r\n\r\n/* 個別ボタン（デフォルト: 34x34, アイコン20x20） */\r\n.twblock-btn {\r\n  display: inline-flex;\r\n  align-items: center;\r\n  justify-content: center;\r\n  width: 34px;\r\n  height: 34px;\r\n  border-radius: 50%;\r\n  border: none;\r\n  background: transparent;\r\n  cursor: pointer;\r\n  padding: 0;\r\n  transition: background-color 0.15s ease, color 0.15s ease;\r\n  color: light-dark(rgb(83, 100, 113), rgb(113, 118, 123));\r\n  outline: none;\r\n}\r\n\r\n.twblock-btn:focus-visible {\r\n  box-shadow: 0 0 0 2px rgb(29, 155, 240);\r\n}\r\n\r\n.twblock-btn svg {\r\n  width: 20px;\r\n  height: 20px;\r\n  fill: currentColor;\r\n  pointer-events: none;\r\n}\r\n\r\n/* ブロックボタン: ホバーで赤 */\r\n.twblock-block:hover:not(:disabled) {\r\n  background-color: rgba(244, 33, 46, 0.1);\r\n  color: rgb(244, 33, 46);\r\n}\r\n\r\n/* ミュートボタン: ホバーでオレンジ */\r\n.twblock-mute:hover:not(:disabled) {\r\n  background-color: rgba(255, 173, 31, 0.1);\r\n  color: rgb(255, 173, 31);\r\n}\r\n\r\n/* ローディング状態 */\r\n.twblock-loading {\r\n  opacity: 0.5;\r\n  pointer-events: none;\r\n}\r\n\r\n.twblock-loading svg {\r\n  animation: twblock-spin 0.8s linear infinite;\r\n}\r\n\r\n@keyframes twblock-spin {\r\n  from { transform: rotate(0deg); }\r\n  to { transform: rotate(360deg); }\r\n}\r\n\r\n/* 成功状態: 緑 (クリックで解除可能) */\r\n.twblock-success {\r\n  color: rgb(0, 186, 124) !important;\r\n}\r\n\r\n/* 解除のホバー色は、その操作の色に合わせる */\r\n.twblock-block.twblock-success:hover {\r\n  background-color: rgba(244, 33, 46, 0.1) !important;\r\n  color: rgb(244, 33, 46) !important;\r\n}\r\n\r\n.twblock-mute.twblock-success:hover {\r\n  background-color: rgba(255, 173, 31, 0.1) !important;\r\n  color: rgb(255, 173, 31) !important;\r\n}\r\n\r\n/* エラー状態 */\r\n.twblock-error {\r\n  color: rgb(244, 33, 46) !important;\r\n  animation: twblock-shake 0.3s ease;\r\n}\r\n\r\n@keyframes twblock-shake {\r\n  0%, 100% { transform: translateX(0); }\r\n  25% { transform: translateX(-3px); }\r\n  75% { transform: translateX(3px); }\r\n}\r\n\r\n/* 引用ツイートのカードは min-height:64px を持っていて、畳むと 57px のバーだけが残る。\r\n   flex の縦並びなので余りが全部下に落ち、下だけ 5px 長く見える。\r\n   畳んだ親は可視の子がバー1枚だけなので、中央に置いて差を分ける。\r\n   横並びの親では主軸が水平で、バーが width:100% なので何も起きない */\r\n[data-twblock-collapsed] {\r\n  justify-content: center;\r\n}\r\n\r\n/* ---- ブロック/ミュート後の非表示バー ---- */\r\n/* 畳んだ投稿の中身。JSでも display:none を入れているが、画像の遅延ロードのように\r\n   後から足される子はここで隠す。これが無いと隠し直すために毎フレーム走ることになる */\r\n[data-twblock-collapsed] > *:not(.twblock-hidden-bar) {\r\n  display: none !important;\r\n}\r\n\r\n.twblock-hidden-bar {\r\n  display: flex;\r\n  align-items: center;\r\n  /* X の reset は自前のクラスにしか box-sizing を当てないので、こちらは\r\n     初期値の content-box のままになる。width:100% と padding が足し算になり、\r\n     cellInnerDiv のような伸び縮みしない親では右へ32pxはみ出して、\r\n     右端に寄せたボタンがツイートの外に出る */\r\n  box-sizing: border-box;\r\n  /* 幅いっぱいに広げたので、center だと文字が真ん中に飛ぶ。本文と同じ左寄せ */\r\n  justify-content: flex-start;\r\n  flex-wrap: wrap;\r\n  gap: 8px 12px;\r\n  padding: 14px 16px;\r\n  font-family: -apple-system, BlinkMacSystemFont, \"Segoe UI\", Roboto, Helvetica, Arial, sans-serif;\r\n  /* article[data-testid=\"tweet\"] は flex の行なので、指定しないと文字幅まで縮む。\r\n     縮むと下線も文字の下だけになり、X のセル区切り線と1px差で二重に見える。\r\n     区切り線は X 側が持っているので、こちらは線を引かない */\r\n  width: 100%;\r\n}\r\n\r\n.twblock-hidden-label {\r\n  color: rgb(113, 118, 123);\r\n  font-size: 14px;\r\n}\r\n\r\n/* ボタン群は行の右端へ。ブロック/ミュートを押した直後のカーソルがそこにいる */\r\n.twblock-hidden-bar:not(.twblock-notice-bar) .twblock-show-btn:first-of-type {\r\n  margin-left: auto;\r\n}\r\n\r\n.twblock-show-btn {\r\n  background: none;\r\n  border: 1px solid light-dark(rgb(207, 217, 222), rgb(83, 100, 113));\r\n  border-radius: 16px;\r\n  color: light-dark(rgb(15, 20, 26), rgb(239, 243, 244));\r\n  font-size: 13px;\r\n  padding: 4px 14px;\r\n  cursor: pointer;\r\n  transition: background-color 0.15s ease;\r\n  white-space: nowrap;\r\n}\r\n\r\n.twblock-show-btn:hover:not(:disabled) {\r\n  background-color: light-dark(rgba(15, 20, 25, 0.1), rgba(239, 243, 244, 0.1));\r\n}\r\n\r\n.twblock-show-btn:disabled {\r\n  opacity: 0.5;\r\n  cursor: default;\r\n}\r\n\r\n/* ミュート→ブロックの切り替え */\r\n.twblock-show-btn.twblock-bar-danger {\r\n  border-color: rgba(244, 33, 46, 0.5);\r\n  color: rgb(244, 33, 46);\r\n}\r\n\r\n.twblock-show-btn.twblock-bar-danger:hover:not(:disabled) {\r\n  background-color: rgba(244, 33, 46, 0.1);\r\n}\r\n\r\n/* API側で解除できないときの逃げ道 */\r\n.twblock-show-btn.twblock-bar-force {\r\n  border-style: dashed;\r\n  color: rgb(113, 118, 123);\r\n}\r\n\r\n/* ---- プロフィールでブロックした直後の通知バー ----\r\n   X 純正の「You have muted posts from this account. Unmute」に合わせる。\r\n   枠も背景も持たず、15px/20px のグレー本文＋アクセント色のテキストリンク。\r\n   採寸値: color rgb(113,118,123) / link rgb(29,155,240) / margin 12px 0 / padding 0 */\r\n.twblock-notice-bar {\r\n  display: block;\r\n  margin: 12px 0;\r\n  padding: 0;\r\n  border: none;\r\n  font-size: 15px;\r\n  line-height: 20px;\r\n}\r\n\r\n.twblock-notice-bar .twblock-hidden-label {\r\n  font-size: 15px;\r\n  line-height: 20px;\r\n}\r\n\r\n.twblock-notice-bar .twblock-show-btn {\r\n  border: none;\r\n  border-radius: 0;\r\n  padding: 0;\r\n  margin-left: 8px;\r\n  background: none;\r\n  font-size: 15px;\r\n  line-height: 20px;\r\n  color: var(--twblock-accent, rgb(29, 155, 240));\r\n}\r\n\r\n.twblock-notice-bar .twblock-show-btn:hover:not(:disabled) {\r\n  background: none;\r\n  text-decoration: underline;\r\n}\r\n\r\n/* ---- トースト通知 ---- */\r\n.twblock-toast {\r\n  position: fixed;\r\n  bottom: 40px;\r\n  left: 50%;\r\n  transform: translateX(-50%);\r\n  background: rgb(29, 155, 240);\r\n  color: rgb(255, 255, 255);\r\n  padding: 12px 24px;\r\n  border-radius: 4px;\r\n  font-size: 15px;\r\n  font-family: -apple-system, BlinkMacSystemFont, \"Segoe UI\", Roboto, sans-serif;\r\n  z-index: 10000;\r\n  animation: twblock-toast-in 0.3s ease;\r\n}\r\n\r\n.twblock-toast-hide {\r\n  opacity: 0;\r\n  transition: opacity 0.3s ease;\r\n}\r\n\r\n@keyframes twblock-toast-in {\r\n  from { opacity: 0; transform: translateX(-50%) translateY(10px); }\r\n  to { opacity: 1; transform: translateX(-50%) translateY(0); }\r\n}\r\n";
+    style.textContent = "/* ========== Ultimate Twitter Block ========== */\r\n\r\n/* ボタンコンテナ（共通） */\r\n.twblock-btn-container {\r\n  display: flex;\r\n  align-items: center;\r\n  flex-shrink: 0;\r\n}\r\n\r\n/* ツイートヘッダー: Grok/caret行内に配置 (Grok/caretと同サイズ) */\r\n.twblock-btn-container.twblock-tweet {\r\n  flex: 0 0 auto;\r\n  gap: 8px;\r\n}\r\n\r\n.twblock-btn-container.twblock-tweet .twblock-btn {\r\n  width: 20px;\r\n  height: 20px;\r\n  position: relative;\r\n  overflow: visible;\r\n}\r\n\r\n/* ホバー時の丸は見た目専用。クリック判定は ::after が持つ */\r\n.twblock-btn-container.twblock-tweet .twblock-btn::before {\r\n  content: '';\r\n  position: absolute;\r\n  top: 50%;\r\n  left: 50%;\r\n  width: 34px;\r\n  height: 34px;\r\n  margin: -17px;\r\n  border-radius: 50%;\r\n  transition: background-color 0.15s ease;\r\n  pointer-events: none;\r\n}\r\n\r\n/* クリック判定を広げる。左右はボタン間の隙間(8px)の半分ずつだけ取り、\r\n   隣のボタンと取り合いにならないようにする */\r\n.twblock-btn-container.twblock-tweet .twblock-btn::after {\r\n  content: '';\r\n  position: absolute;\r\n  top: 50%;\r\n  left: 50%;\r\n  width: 28px;\r\n  height: 32px;\r\n  margin: -16px -14px;\r\n}\r\n\r\n/* 狭い画面ではヘッダーに Follow ボタンが出る。この行は上揃えのことがあり\r\n   （iPhone 実測）、背の高いものだけが下にはみ出す。行の揃え方に関係なく、\r\n   Follow や caret と中心を合わせる */\r\ndiv:has([data-testid$=\"-follow\"], [data-testid$=\"-unfollow\"]) > .twblock-btn-container.twblock-tweet:not(.twblock-repost) {\r\n  align-self: center;\r\n}\r\n\r\n/* Follow が 32px の pill で出るとき（PCの狭い窓）だけ、X のボタンと釣り合うように丸で囲う。\r\n   スマホの Follow は 24px で、そこに 32px の丸を付けると grok や ⋯ より大きい輪になり、\r\n   しかも上揃えの行で 4px 下にはみ出す。だから小さいときは素のアイコンのままにする。\r\n   pill かどうかは content.js が判定して .twblock-pill を付ける。\r\n   :has() も残してあるので、窓を広げて Follow が消えれば印が残っていても丸は消える */\r\ndiv:has([data-testid$=\"-follow\"], [data-testid$=\"-unfollow\"]) > .twblock-btn-container.twblock-tweet.twblock-pill:not(.twblock-repost) {\r\n  gap: 6px;\r\n}\r\n\r\ndiv:has([data-testid$=\"-follow\"], [data-testid$=\"-unfollow\"]) > .twblock-btn-container.twblock-tweet.twblock-pill:not(.twblock-repost) .twblock-btn {\r\n  width: 32px;\r\n  height: 32px;\r\n  /* 輪郭だけ Follow ボタンの色を薄く借りる。アイコン自体は caret や ⋯ と同じ灰色のまま\r\n     （--twblock-follow-tone は content.js が隣の Follow ボタンから実測して入れる） */\r\n  border: 1px solid color-mix(in srgb, var(--twblock-follow-tone, currentColor) 35%, transparent);\r\n  border-radius: 9999px;\r\n}\r\n\r\n/* ホバーの丸も同じ大きさに。margin は直径の半分（既定の -17px は 34px 用） */\r\ndiv:has([data-testid$=\"-follow\"], [data-testid$=\"-unfollow\"]) > .twblock-btn-container.twblock-tweet.twblock-pill:not(.twblock-repost) .twblock-btn::before {\r\n  width: 32px;\r\n  height: 32px;\r\n  margin: -16px;\r\n}\r\n\r\n/* この行では X の caret や ⋯ が白なので、アイコンもそれに合わせる（行から継承する）。\r\n   :not(:hover) にしてあるのは、ホバー時の赤/青を上書きしないため */\r\ndiv:has([data-testid$=\"-follow\"], [data-testid$=\"-unfollow\"]) > .twblock-btn-container.twblock-tweet.twblock-pill:not(.twblock-repost) .twblock-btn:not(:hover) {\r\n  color: inherit;\r\n}\r\n\r\n.twblock-btn-container.twblock-tweet .twblock-btn svg {\r\n  width: 18.75px;\r\n  height: 18.75px;\r\n  position: relative;\r\n}\r\n\r\n/* ツイートボタン: ホバー背景は::beforeで表示、ボタン自体は透明 */\r\n.twblock-btn-container.twblock-tweet .twblock-block:hover:not(:disabled),\r\n.twblock-btn-container.twblock-tweet .twblock-mute:hover:not(:disabled) {\r\n  background-color: transparent;\r\n}\r\n\r\n.twblock-btn-container.twblock-tweet .twblock-block:hover:not(:disabled)::before {\r\n  background-color: rgba(244, 33, 46, 0.1);\r\n}\r\n\r\n.twblock-btn-container.twblock-tweet .twblock-mute:hover:not(:disabled)::before {\r\n  background-color: rgba(255, 173, 31, 0.1);\r\n}\r\n\r\n.twblock-btn-container.twblock-tweet .twblock-success:hover {\r\n  background-color: transparent !important;\r\n}\r\n\r\n.twblock-btn-container.twblock-tweet .twblock-block.twblock-success:hover::before {\r\n  background-color: rgba(244, 33, 46, 0.1);\r\n}\r\n\r\n.twblock-btn-container.twblock-tweet .twblock-mute.twblock-success:hover::before {\r\n  background-color: rgba(255, 173, 31, 0.1);\r\n}\r\n\r\n\r\n/* ---- x-web（ログアウト中の新しいフロント）に馴染ませる ----\r\n   x-web は色を CSS 変数で外に出していないので、行の文字色（テーマで白/黒が変わる）\r\n   から作る。実測（ダーク）: 本文 #fff / 補足 rgba(255,255,255,.6) /\r\n   輪郭 rgba(255,255,255,.15)。ライトでも同じ比率で黒から作られる */\r\n\r\n/* ボタン: ヘッダー右端の「もっと見る」と同じ 32px の丸。アイコンは\r\n   エンゲージメント行と同じ 18px で、色も「もっと見る」と同じ本文色。\r\n   -8px は「もっと見る」と同じ -my-2（行の高さを押し広げない） */\r\n.twblock-btn-container.twblock-xweb {\r\n  gap: 0;\r\n  margin: -8px 0;\r\n}\r\n\r\n.twblock-btn-container.twblock-xweb .twblock-btn {\r\n  width: 32px;\r\n  height: 32px;\r\n}\r\n\r\n.twblock-btn-container.twblock-xweb .twblock-btn:not(:hover):not(.twblock-success) {\r\n  color: inherit;\r\n}\r\n\r\n.twblock-btn-container.twblock-xweb .twblock-btn svg {\r\n  width: 18px;\r\n  height: 18px;\r\n}\r\n\r\n.twblock-btn-container.twblock-xweb .twblock-btn::before {\r\n  width: 32px;\r\n  height: 32px;\r\n  margin: -16px;\r\n}\r\n\r\n.twblock-btn-container.twblock-xweb .twblock-btn::after {\r\n  width: 32px;\r\n  height: 32px;\r\n  margin: -16px;\r\n}\r\n\r\n/* 畳んだ投稿のバー。投稿の余白は外側の entry（px-horizontal py-vertical）が持つので、\r\n   こちらは余白を足さず、アバターの左端に文字をそろえる */\r\n[data-timeline-entry] > article > .twblock-hidden-bar {\r\n  padding: 0;\r\n  min-height: 32px;\r\n  font-family: inherit;\r\n}\r\n\r\n/* 引用カードの中は X 自身が 12px（p-3）の余白を取っている */\r\narticle [data-timeline-entry] > article > .twblock-hidden-bar {\r\n  padding: 12px;\r\n}\r\n\r\n[data-timeline-entry] > article > .twblock-hidden-bar .twblock-hidden-label {\r\n  color: color-mix(in srgb, currentColor 60%, transparent);\r\n  font-size: 15px;\r\n  line-height: 20px;\r\n}\r\n\r\n/* X の輪郭ボタン（「@ポスト」など）を 32px にしたもの */\r\n[data-timeline-entry] > article > .twblock-hidden-bar .twblock-show-btn {\r\n  height: 32px;\r\n  padding: 0 16px;\r\n  border-radius: 9999px;\r\n  font-family: inherit;\r\n  font-size: 14px;\r\n  font-weight: 500;\r\n  line-height: 16px;\r\n}\r\n\r\n/* 「ブロックに切替」の赤だけは残す */\r\n[data-timeline-entry] > article > .twblock-hidden-bar .twblock-show-btn:not(.twblock-bar-danger) {\r\n  border-color: color-mix(in srgb, currentColor 15%, transparent);\r\n  color: inherit;\r\n}\r\n\r\n[data-timeline-entry] > article > .twblock-hidden-bar .twblock-show-btn:hover:not(:disabled) {\r\n  background-color: color-mix(in srgb, currentColor 10%, transparent);\r\n}\r\n\r\n/* RT(\"reposted\")行の親をflex-rowに変更して横並びにする */\r\n.twblock-repost-row {\r\n  flex-direction: row !important;\r\n  align-items: center;\r\n  gap: 4px;\r\n}\r\n\r\n/* RT(\"reposted\")行: テキスト(16px/20px line-height)とアイコンの中心を揃える */\r\n.twblock-btn-container.twblock-repost {\r\n  gap: 4px;\r\n  margin-top: -2px;\r\n  margin-bottom: -2px;\r\n}\r\n\r\n/* 行が詰まっているので丸い背景は出さないが、押せる範囲は確保する */\r\n.twblock-btn-container.twblock-repost .twblock-btn::before {\r\n  display: none;\r\n}\r\n\r\n.twblock-btn-container.twblock-repost .twblock-btn::after {\r\n  width: 24px;\r\n  height: 26px;\r\n  margin: -13px -12px;\r\n}\r\n\r\n/* プロフィール: Followボタンと同じ高さ(36px)の丸ボタン */\r\n.twblock-btn-container.twblock-profile {\r\n  gap: 8px;\r\n  align-self: flex-start;\r\n  margin-right: 8px;\r\n}\r\n\r\n/* X はプロフィールの操作行にボタンを後から足すことがある（サブスク等）。\r\n   Followボタンの直前に挿しても、後から生えたものがこちらとFollowの間に割り込むので、\r\n   同じプロフィールでもリロードのたびに並び順が変わる。\r\n   DOM上の位置に関係なく「X のボタン群 → こちら → Follow」に固定する。\r\n   :has() が無い環境では order を付けないでおく（付けるとFollowより右へ行ってしまう） */\r\n@supports selector(:has(*)) {\r\n  .twblock-btn-container.twblock-profile {\r\n    order: 1;\r\n  }\r\n\r\n  div:has(> .twblock-btn-container.twblock-profile) > [data-testid=\"placementTracking\"] {\r\n    order: 2;\r\n  }\r\n\r\n}\r\n\r\n.twblock-btn-container.twblock-profile .twblock-btn {\r\n  width: 36px;\r\n  height: 36px;\r\n  border-radius: 50%;\r\n  border: 1px solid light-dark(rgb(207, 217, 222), rgb(83, 100, 113));\r\n  color: light-dark(rgb(15, 20, 26), rgb(230, 233, 234));\r\n}\r\n\r\n.twblock-btn-container.twblock-profile .twblock-btn svg {\r\n  width: 20px;\r\n  height: 20px;\r\n}\r\n\r\n/* 検索候補(typeahead): Xボタンの左に配置 */\r\n.twblock-btn-container.twblock-typeahead {\r\n  gap: 4px;\r\n  flex-shrink: 0;\r\n  margin-left: auto;\r\n}\r\n\r\n.twblock-btn-container.twblock-typeahead .twblock-btn {\r\n  width: 20px;\r\n  height: 20px;\r\n}\r\n\r\n.twblock-btn-container.twblock-typeahead .twblock-btn svg {\r\n  width: 18px;\r\n  height: 18px;\r\n}\r\n\r\n/* サイドバー / フォロー一覧: 32px丸ボタン */\r\n.twblock-btn-container.twblock-sidebar {\r\n  gap: 4px;\r\n  flex-shrink: 0;\r\n  /* Verified Followers / Following の行は justify-content: space-between なので、\r\n     Followボタンと別のflexアイテムとして置くと空きスペースを山分けされて真ん中に飛ぶ。\r\n     auto マージンで余白を全部こちら側に吸わせて、Followボタンの隣に寄せる。\r\n     余白が無い行（Followers など）では 0 に解決されるので位置は変わらない */\r\n  margin-left: auto;\r\n}\r\n\r\n/* Followボタンを包み直す（reparent）とReactのDOM差分が壊れるので、\r\n   間隔は隣接兄弟セレクタだけで確保する（Issue #14）。\r\n   X 側は 12px だが、ここを 4px にすると v2.2.4（ラッパーで margin を 0 にして\r\n   gap:4px を当てていた）と同じ見た目になる。実ページで採寸して確認済み。\r\n   コンテナの直後は必ず Follow ボタンの親なので、他の要素には当たらない */\r\n.twblock-btn-container.twblock-sidebar + * {\r\n  margin-left: 4px !important;\r\n}\r\n\r\n.twblock-btn-container.twblock-sidebar .twblock-btn {\r\n  width: 32px;\r\n  height: 32px;\r\n  border-radius: 50%;\r\n  border: 1px solid light-dark(rgb(207, 217, 222), rgb(83, 100, 113));\r\n  color: light-dark(rgb(15, 20, 26), rgb(230, 233, 234));\r\n}\r\n\r\n.twblock-btn-container.twblock-sidebar .twblock-btn svg {\r\n  width: 18px;\r\n  height: 18px;\r\n}\r\n\r\n/* ホバーカード: Followボタンとの間隔を少し広めに */\r\n.twblock-btn-container.twblock-hovercard + * {\r\n  margin-left: 8px !important;\r\n}\r\n\r\n/* ホバーカードの行は 64px のアバターが高さを決めていて align-items: stretch。\r\n   X の Followボタン(36px)はその箱の上端に置かれるので、共通の center 揃えの\r\n   ままだと自分のボタンだけ 14px 下にずれる（実測: 中心 719 対 705）。\r\n   X と同じく上端に寄せ、36pxのpillと32pxの丸の差 (36-32)/2 を足して中心を揃える */\r\n.twblock-btn-container.twblock-hovercard {\r\n  align-items: flex-start;\r\n  padding-top: 2px;\r\n}\r\n\r\n\r\n/* 個別ボタン（デフォルト: 34x34, アイコン20x20） */\r\n.twblock-btn {\r\n  display: inline-flex;\r\n  align-items: center;\r\n  justify-content: center;\r\n  width: 34px;\r\n  height: 34px;\r\n  border-radius: 50%;\r\n  border: none;\r\n  background: transparent;\r\n  cursor: pointer;\r\n  padding: 0;\r\n  transition: background-color 0.15s ease, color 0.15s ease;\r\n  color: light-dark(rgb(83, 100, 113), rgb(113, 118, 123));\r\n  outline: none;\r\n}\r\n\r\n.twblock-btn:focus-visible {\r\n  box-shadow: 0 0 0 2px rgb(29, 155, 240);\r\n}\r\n\r\n.twblock-btn svg {\r\n  width: 20px;\r\n  height: 20px;\r\n  fill: currentColor;\r\n  pointer-events: none;\r\n}\r\n\r\n/* ブロックボタン: ホバーで赤 */\r\n.twblock-block:hover:not(:disabled) {\r\n  background-color: rgba(244, 33, 46, 0.1);\r\n  color: rgb(244, 33, 46);\r\n}\r\n\r\n/* ミュートボタン: ホバーでオレンジ */\r\n.twblock-mute:hover:not(:disabled) {\r\n  background-color: rgba(255, 173, 31, 0.1);\r\n  color: rgb(255, 173, 31);\r\n}\r\n\r\n/* ローディング状態 */\r\n.twblock-loading {\r\n  opacity: 0.5;\r\n  pointer-events: none;\r\n}\r\n\r\n.twblock-loading svg {\r\n  animation: twblock-spin 0.8s linear infinite;\r\n}\r\n\r\n@keyframes twblock-spin {\r\n  from { transform: rotate(0deg); }\r\n  to { transform: rotate(360deg); }\r\n}\r\n\r\n/* 成功状態: 緑 (クリックで解除可能) */\r\n.twblock-success {\r\n  color: rgb(0, 186, 124) !important;\r\n}\r\n\r\n/* 解除のホバー色は、その操作の色に合わせる */\r\n.twblock-block.twblock-success:hover {\r\n  background-color: rgba(244, 33, 46, 0.1) !important;\r\n  color: rgb(244, 33, 46) !important;\r\n}\r\n\r\n.twblock-mute.twblock-success:hover {\r\n  background-color: rgba(255, 173, 31, 0.1) !important;\r\n  color: rgb(255, 173, 31) !important;\r\n}\r\n\r\n/* エラー状態 */\r\n.twblock-error {\r\n  color: rgb(244, 33, 46) !important;\r\n  animation: twblock-shake 0.3s ease;\r\n}\r\n\r\n@keyframes twblock-shake {\r\n  0%, 100% { transform: translateX(0); }\r\n  25% { transform: translateX(-3px); }\r\n  75% { transform: translateX(3px); }\r\n}\r\n\r\n/* 引用ツイートのカードは min-height:64px を持っていて、畳むと 57px のバーだけが残る。\r\n   flex の縦並びなので余りが全部下に落ち、下だけ 5px 長く見える。\r\n   畳んだ親は可視の子がバー1枚だけなので、中央に置いて差を分ける。\r\n   横並びの親では主軸が水平で、バーが width:100% なので何も起きない */\r\n[data-twblock-collapsed] {\r\n  justify-content: center;\r\n}\r\n\r\n/* ---- ブロック/ミュート後の非表示バー ---- */\r\n/* 畳んだ投稿の中身。JSでも display:none を入れているが、画像の遅延ロードのように\r\n   後から足される子はここで隠す。これが無いと隠し直すために毎フレーム走ることになる */\r\n[data-twblock-collapsed] > *:not(.twblock-hidden-bar) {\r\n  display: none !important;\r\n}\r\n\r\n.twblock-hidden-bar {\r\n  display: flex;\r\n  align-items: center;\r\n  /* X の reset は自前のクラスにしか box-sizing を当てないので、こちらは\r\n     初期値の content-box のままになる。width:100% と padding が足し算になり、\r\n     cellInnerDiv のような伸び縮みしない親では右へ32pxはみ出して、\r\n     右端に寄せたボタンがツイートの外に出る */\r\n  box-sizing: border-box;\r\n  /* 幅いっぱいに広げたので、center だと文字が真ん中に飛ぶ。本文と同じ左寄せ */\r\n  justify-content: flex-start;\r\n  flex-wrap: wrap;\r\n  gap: 8px 12px;\r\n  padding: 14px 16px;\r\n  font-family: -apple-system, BlinkMacSystemFont, \"Segoe UI\", Roboto, Helvetica, Arial, sans-serif;\r\n  /* article[data-testid=\"tweet\"] は flex の行なので、指定しないと文字幅まで縮む。\r\n     縮むと下線も文字の下だけになり、X のセル区切り線と1px差で二重に見える。\r\n     区切り線は X 側が持っているので、こちらは線を引かない */\r\n  width: 100%;\r\n}\r\n\r\n.twblock-hidden-label {\r\n  color: rgb(113, 118, 123);\r\n  font-size: 14px;\r\n}\r\n\r\n/* ボタン群は行の右端へ。ブロック/ミュートを押した直後のカーソルがそこにいる */\r\n.twblock-hidden-bar:not(.twblock-notice-bar) .twblock-show-btn:first-of-type {\r\n  margin-left: auto;\r\n}\r\n\r\n.twblock-show-btn {\r\n  background: none;\r\n  border: 1px solid light-dark(rgb(207, 217, 222), rgb(83, 100, 113));\r\n  border-radius: 16px;\r\n  color: light-dark(rgb(15, 20, 26), rgb(239, 243, 244));\r\n  font-size: 13px;\r\n  padding: 4px 14px;\r\n  cursor: pointer;\r\n  transition: background-color 0.15s ease;\r\n  white-space: nowrap;\r\n}\r\n\r\n.twblock-show-btn:hover:not(:disabled) {\r\n  background-color: light-dark(rgba(15, 20, 25, 0.1), rgba(239, 243, 244, 0.1));\r\n}\r\n\r\n.twblock-show-btn:disabled {\r\n  opacity: 0.5;\r\n  cursor: default;\r\n}\r\n\r\n/* ミュート→ブロックの切り替え */\r\n.twblock-show-btn.twblock-bar-danger {\r\n  border-color: rgba(244, 33, 46, 0.5);\r\n  color: rgb(244, 33, 46);\r\n}\r\n\r\n.twblock-show-btn.twblock-bar-danger:hover:not(:disabled) {\r\n  background-color: rgba(244, 33, 46, 0.1);\r\n}\r\n\r\n/* API側で解除できないときの逃げ道 */\r\n.twblock-show-btn.twblock-bar-force {\r\n  border-style: dashed;\r\n  color: rgb(113, 118, 123);\r\n}\r\n\r\n/* ---- プロフィールでブロックした直後の通知バー ----\r\n   X 純正の「You have muted posts from this account. Unmute」に合わせる。\r\n   枠も背景も持たず、15px/20px のグレー本文＋アクセント色のテキストリンク。\r\n   採寸値: color rgb(113,118,123) / link rgb(29,155,240) / margin 12px 0 / padding 0 */\r\n.twblock-notice-bar {\r\n  display: block;\r\n  margin: 12px 0;\r\n  padding: 0;\r\n  border: none;\r\n  font-size: 15px;\r\n  line-height: 20px;\r\n}\r\n\r\n.twblock-notice-bar .twblock-hidden-label {\r\n  font-size: 15px;\r\n  line-height: 20px;\r\n}\r\n\r\n.twblock-notice-bar .twblock-show-btn {\r\n  border: none;\r\n  border-radius: 0;\r\n  padding: 0;\r\n  margin-left: 8px;\r\n  background: none;\r\n  font-size: 15px;\r\n  line-height: 20px;\r\n  color: var(--twblock-accent, rgb(29, 155, 240));\r\n}\r\n\r\n.twblock-notice-bar .twblock-show-btn:hover:not(:disabled) {\r\n  background: none;\r\n  text-decoration: underline;\r\n}\r\n\r\n/* ---- トースト通知 ---- */\r\n.twblock-toast {\r\n  position: fixed;\r\n  bottom: 40px;\r\n  left: 50%;\r\n  transform: translateX(-50%);\r\n  background: rgb(29, 155, 240);\r\n  color: rgb(255, 255, 255);\r\n  padding: 12px 24px;\r\n  border-radius: 4px;\r\n  font-size: 15px;\r\n  font-family: -apple-system, BlinkMacSystemFont, \"Segoe UI\", Roboto, sans-serif;\r\n  z-index: 10000;\r\n  animation: twblock-toast-in 0.3s ease;\r\n}\r\n\r\n.twblock-toast-hide {\r\n  opacity: 0;\r\n  transition: opacity 0.3s ease;\r\n}\r\n\r\n@keyframes twblock-toast-in {\r\n  from { opacity: 0; transform: translateX(-50%) translateY(10px); }\r\n  to { opacity: 1; transform: translateX(-50%) translateY(0); }\r\n}\r\n";
     (document.head || document.documentElement).appendChild(style);
   }
 
@@ -1360,6 +1360,13 @@
     return Boolean(me && screenName && nameKey(me) === nameKey(screenName));
   }
 
+  // ブロック/ミュートの API は ct0（X のCSRFトークン）が無いと通らない。
+  // ログアウト中は X が ct0 を消すので、押しても必ず失敗するボタンは出さない。
+  // pageScript の getHeaders も同じ cookie で判定している
+  function canAct() {
+    return /(?:^|;\s*)ct0=[^;]/.test(document.cookie);
+  }
+
   // ---- Twitterアクセントカラー取得 ----
   const ACCENT_COLORS = new Set([
     'rgb(29, 155, 240)',   // Blue
@@ -1467,7 +1474,16 @@
     label.textContent = options.nameless ? statusLabel : statusLabel + ' @' + screenName;
     bar.appendChild(label);
 
-    if (options.undo !== false) {
+    // ログアウト中は解除も切替も API が通らない。記録には触れず、この投稿だけ開く
+    if (options.undo !== false && !canAct()) {
+      const showBtn = makeBarButton(msg('showPostLabel'));
+      showBtn.addEventListener('click', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        closeStateBar(bar);
+      });
+      bar.appendChild(showBtn);
+    } else if (options.undo !== false) {
     // ミュート済みからブロックへ切り替え（ボタンの押し間違い救済）。
     // ブロックボタンを隠す設定は「TLを散らかしたくない」であって
     // 「ブロックしない」ではないので、ここには出す
@@ -1679,7 +1695,7 @@
 
   // ---- ボタン作成 ----
   function createButtons(screenName) {
-    if (!showBlock && !showMute) return null;
+    if (!showAnyButton()) return null;
 
     const container = document.createElement('div');
     container.className = 'twblock-btn-container';
@@ -1855,6 +1871,7 @@
 
   // ツイート本文エリアからscreen_nameを抽出（socialContext内のリンクを除外）
   function extractAuthorScreenName(tweet) {
+    if (isXwebArticle(tweet)) return extractXwebAuthor(tweet);
     const userName = tweet.querySelector('[data-testid="User-Name"]');
     if (userName) {
       const result = extractScreenName(userName);
@@ -1992,7 +2009,7 @@
   }
 
   function showAnyButton() {
-    return showBlock || showMute;
+    return (showBlock || showMute) && canAct();
   }
 
   // ---- ボタン挿入: タイムラインツイート ----
@@ -2137,6 +2154,110 @@
       const blockedAction = primaryAction(getUserState(qtScreenName));
       if (blockedAction && !isViewingProfileTimeline(qtScreenName)) {
         hideQuotedTweet(block, qtScreenName);
+      }
+    });
+  }
+
+  // ---- x-web（ログアウト中に配られる新しいフロント） ----
+  // 応答ヘッダーが x-server: x-web で、data-testid を1つも持たない。
+  // 投稿は [data-timeline-entry] > article で、引用カードは投稿の article の中に
+  // もう1段 [data-timeline-entry] > article として入る。一覧の entry は
+  // data-href="/<著者>/status/<id>" を持つ（会話ページの本体だけは持たない）
+  const XWEB_ARTICLE_SELECTOR = '[data-timeline-entry] > article';
+  const STATUS_PATH_RE = /^\/([A-Za-z0-9_]{1,15})\/status\/\d+$/;
+
+  function isXwebArticle(article) {
+    const entry = article.parentElement;
+    return Boolean(entry && entry.hasAttribute('data-timeline-entry'));
+  }
+
+  // スマホ幅では投稿へのリンクが https://m.x.com/<著者>/status/<id>?launch_app_store=true
+  // の絶対URLになる（ユーザーへのリンクは /<名前> のまま）。X のURLなら path だけを見る
+  function statusAuthorFromHref(href) {
+    if (!href) return null;
+    let pathname = href;
+    if (href.charAt(0) !== '/') {
+      try {
+        const url = new URL(href);
+        if (!/(^|\.)(x|twitter)\.com$/.test(url.hostname)) return null;
+        pathname = url.pathname;
+      } catch (err) {
+        return null;
+      }
+    }
+    const m = pathname.match(STATUS_PATH_RE);
+    return m ? m[1] : null;
+  }
+
+  function extractXwebAuthor(article) {
+    const entry = article.parentElement;
+    const own = statusAuthorFromHref(entry.getAttribute('data-href'));
+    if (own) return own;
+    // 会話ページの本体: 日時のリンクが /<著者>/status/<id>。引用カードの中のリンクは除く
+    for (const link of article.querySelectorAll('a[href*="/status/"]')) {
+      if (link.closest('[data-timeline-entry]') !== entry) continue;
+      const author = statusAuthorFromHref(link.getAttribute('href'));
+      if (author) return author;
+    }
+    return null;
+  }
+
+  // ヘッダー右端の「もっと見る」。エンゲージメント行のリポスト/共有も
+  // aria-haspopup="menu" を持つので、アイコン名で選ぶ
+  function findXwebMoreButton(article) {
+    for (const icon of article.querySelectorAll('svg[data-icon="icon-more"]')) {
+      const btn = icon.closest('button');
+      if (btn && btn.closest('article') === article) return btn;
+    }
+    return null;
+  }
+
+  function placeXwebPostButtons(article, screenName) {
+    const more = findXwebMoreButton(article);
+    if (!more || hasOwnContainer(more.parentElement)) return;
+    const buttons = createButtons(screenName);
+    if (!buttons) return;
+    buttons.classList.add('twblock-tweet', 'twblock-xweb');
+    more.parentElement.insertBefore(buttons, more);
+    syncContainer(buttons, screenName);
+  }
+
+  // 引用カードには「もっと見る」が無い。アバターと名前の行の右端に置く
+  function placeXwebQuotedButtons(article, screenName) {
+    const key = nameKey(screenName);
+    let row = null;
+    for (const link of article.querySelectorAll('a[href]')) {
+      if (nameKey(link.getAttribute('href')) === '/' + key) { row = link.parentElement; break; }
+    }
+    if (!row || row === article || hasOwnContainer(row)) return;
+    const buttons = createButtons(screenName);
+    if (!buttons) return;
+    buttons.classList.add('twblock-tweet', 'twblock-xweb');
+    buttons.style.marginLeft = 'auto';
+    buttons.style.paddingLeft = '8px';
+    row.appendChild(buttons);
+    syncContainer(buttons, screenName);
+  }
+
+  function processXweb() {
+    const articles = document.querySelectorAll(XWEB_ARTICLE_SELECTOR + ':not([' + PROCESSED + '])');
+    articles.forEach((article) => {
+      const author = extractXwebAuthor(article);
+      if (!author) {
+        if (!countRetry(article)) article.setAttribute(PROCESSED, '1');
+        return;
+      }
+      article.setAttribute(PROCESSED, '1');
+      article.removeAttribute(RETRY_ATTR);
+      if (isMe(author)) return;
+
+      const quoted = Boolean(article.parentElement.closest('article'));
+      article.setAttribute(quoted ? QUOTED_ATTR : AUTHOR_ATTR, nameKey(author));
+      if (quoted) placeXwebQuotedButtons(article, author);
+      else placeXwebPostButtons(article, author);
+
+      if (primaryAction(getUserState(author)) && !isViewingProfileTimeline(author)) {
+        hideElement(article, author);
       }
     });
   }
@@ -2327,6 +2448,7 @@
     try { processTweets(); } catch (err) { console.warn('[twblock] processTweets', err); }
     try { processFollowButtons(); } catch (err) { console.warn('[twblock] processFollowButtons', err); }
     try { processTypeahead(); } catch (err) { console.warn('[twblock] processTypeahead', err); }
+    try { processXweb(); } catch (err) { console.warn('[twblock] processXweb', err); }
     // 描画途中で取れなかった要素は、次の変化を待たずに自分で拾い直す。
     // （以前は X が出し続ける無関係な変化がフォールバックを兼ねていた）
     if (document.querySelector('[' + RETRY_ATTR + ']')) schedulePass(RETRY_PASS_DELAY);
@@ -2337,14 +2459,15 @@
   // 1秒に200回近く childList を動かす。全部に反応すると processAll が毎フレーム走り、
   // その仕事がキー入力と同じフレームに乗る。実測: 何もしていない画面で 44回/秒。
   // 仕事があるのは「data-testid を持つ要素が増えた」ときだけなので、そこで切る。
+  // x-web は data-testid を持たないので、投稿の入れ物（data-timeline-entry）も見る
   function isRelevant(records) {
     for (let i = 0; i < records.length; i++) {
       const added = records[i].addedNodes;
       for (let j = 0; j < added.length; j++) {
         const node = added[j];
         if (node.nodeType !== 1) continue;
-        if (node.hasAttribute('data-testid')) return true;
-        if (node.firstElementChild && node.querySelector('[data-testid]')) return true;
+        if (node.hasAttribute('data-testid') || node.hasAttribute('data-timeline-entry')) return true;
+        if (node.firstElementChild && node.querySelector('[data-testid], [data-timeline-entry]')) return true;
       }
     }
     return false;
@@ -2397,7 +2520,14 @@
       myScreenName = null;
       rescanAll();
     }
+    // ログイン/ログアウトでボタンの有無とバーの中身が変わる
+    const authed = canAct();
+    if (authed !== lastAuthed) {
+      lastAuthed = authed;
+      rescanAll();
+    }
   }
+  let lastAuthed = canAct();
 
   // ---- ストレージ変更のリアルタイム反映 ----
   store.onChanged((changes) => {
